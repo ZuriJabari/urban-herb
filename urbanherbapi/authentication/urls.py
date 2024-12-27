@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import (
     RegistrationViewSet, LoginViewSet, UserViewSet, AddressViewSet, PreferencesViewSet,
     PhoneVerificationView, VerifyPhoneView
@@ -22,7 +22,8 @@ urlpatterns = [
     path('', include(router.urls)),
     path('auth/', include(auth_router.urls)),
     
-    # JWT token refresh
+    # JWT token endpoints
+    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     # Phone verification endpoints
@@ -30,5 +31,5 @@ urlpatterns = [
     path('phone/verify/', VerifyPhoneView.as_view(), name='verify-phone'),
     
     # User profile endpoint
-    path('auth/me/', UserViewSet.as_view({'get': 'me', 'patch': 'me'}), name='user-profile'),
+    path('profile/', UserViewSet.as_view({'get': 'me', 'patch': 'me'}), name='user-profile'),
 ]
