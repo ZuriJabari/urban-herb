@@ -5,6 +5,7 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
 
 jobs:
   test:
@@ -45,3 +46,11 @@ jobs:
         pip install flake8
         flake8 ./urbanherbapi
         cd UrbanHerbWeb && npm run lint
+
+  status-check:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Status Check
+        run: |
+          echo "All checks passed successfully!"
