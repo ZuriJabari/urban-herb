@@ -43,10 +43,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'drf_yasg',
     'django_filters',
+    
+    # Local apps
     'authentication',
     'products',
 ]
@@ -117,7 +122,13 @@ SIMPLE_JWT = {
 }
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173').split(',')
+CORS_ALLOWED_ORIGINS = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', 
+    ','.join([
+        f'http://localhost:{port}' for port in range(8000, 8011)
+    ] + [
+        f'http://127.0.0.1:{port}' for port in range(8000, 8011)
+    ] + ['http://localhost:5173', 'http://127.0.0.1:5173']
+)).split(',')
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -127,6 +138,32 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
+
+# Swagger/OpenAPI settings
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header'
+        }
+    },
+    'USE_SESSION_AUTH': False,
+}
+
+# Redis Cache Configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
+    }
+}
+
+# Cache time to live is 15 minutes
+CACHE_TTL = 60 * 15
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
@@ -162,44 +199,34 @@ LOGGING = {
     },
     'handlers': {
         'file': {
-            'level': os.getenv('LOG_LEVEL', 'DEBUG'),
+            'level': os.getenv('LOG_LEVEL', 'INFO'),
             'class': 'logging.FileHandler',
-            'filename': os.getenv('LOG_FILE', BASE_DIR / 'debug.log'),
+            'filename': os.getenv('LOG_FILE', 'debug.log'),
             'formatter': 'verbose',
         },
         'console': {
-            'level': os.getenv('LOG_LEVEL', 'DEBUG'),
+            'level': os.getenv('LOG_LEVEL', 'INFO'),
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
     },
-    'root': {
-        'handlers': ['console', 'file'],
-        'level': 'INFO',
-    },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['file', 'console'],
             'level': os.getenv('LOG_LEVEL', 'INFO'),
-            'propagate': False,
+            'propagate': True,
         },
-        'urbanherbapi': {
-            'handlers': ['console', 'file'],
-            'level': os.getenv('LOG_LEVEL', 'DEBUG'),
-            'propagate': False,
+        'authentication': {
+            'handlers': ['file', 'console'],
+            'level': os.getenv('LOG_LEVEL', 'INFO'),
+            'propagate': True,
+        },
+        'products': {
+            'handlers': ['file', 'console'],
+            'level': os.getenv('LOG_LEVEL', 'INFO'),
+            'propagate': True,
         },
     },
-}
-
-# Cache Configuration
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        }
-    }
 }
 
 # Feature Flags
