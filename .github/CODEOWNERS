@@ -1,0 +1,14 @@
+# These owners will be the default owners for everything in the repo
+* @ZuriJabari
+
+# Backend code owners
+/urbanherbapi/ @ZuriJabari
+
+# Frontend code owners
+/UrbanHerbWeb/ @ZuriJabari
+
+# Mobile app code owners
+/UrbanHerbApp/ @ZuriJabari
+
+# Documentation owners
+*.md @ZuriJabari
