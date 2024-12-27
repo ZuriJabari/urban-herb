@@ -1,9 +1,13 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import (
-    RegistrationViewSet, LoginViewSet, UserViewSet, AddressViewSet, PreferencesViewSet,
-    PhoneVerificationView, VerifyPhoneView, UserProfileViewSet
+from .views.auth_views import (
+    RegistrationViewSet,
+    LoginViewSet,
+    UserViewSet,
+    AddressViewSet,
+    PreferencesViewSet,
+    PhoneVerificationViewSet
 )
 
 # Create a router for viewsets
@@ -11,19 +15,22 @@ router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='users')
 router.register(r'addresses', AddressViewSet, basename='addresses')
 router.register(r'preferences', PreferencesViewSet, basename='preferences')
-router.register(r'auth/register', RegistrationViewSet, basename='register')
-router.register(r'auth/login', LoginViewSet, basename='login')
-router.register(r'auth/phone/send-verification', PhoneVerificationView, basename='send-phone-verification')
-router.register(r'auth/phone/verify', VerifyPhoneView, basename='verify-phone')
-router.register(r'profiles', UserProfileViewSet, basename='profile')
+router.register(r'auth/phone', PhoneVerificationViewSet, basename='phone-verification')
 
 urlpatterns = [
     # ViewSet URLs
     path('', include(router.urls)),
     
+    # Auth endpoints
+    path('auth/register/', RegistrationViewSet.as_view({'post': 'register'}), name='register'),
+    path('auth/login/', LoginViewSet.as_view({'post': 'login'}), name='login'),
+    path('auth/password/reset/', LoginViewSet.as_view({'post': 'request_password_reset'}), name='password-reset'),
+    path('auth/password/reset/confirm/', LoginViewSet.as_view({'post': 'reset_password'}), name='password-reset-confirm'),
+    path('auth/verify-email/', LoginViewSet.as_view({'post': 'verify_email'}), name='verify-email'),
+    
     # JWT token endpoints
-    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     # User profile endpoint
     path('auth/profile/', UserViewSet.as_view({'get': 'me', 'patch': 'me'}), name='user-profile'),

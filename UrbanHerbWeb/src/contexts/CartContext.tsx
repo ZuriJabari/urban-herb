@@ -63,47 +63,33 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const removeItem = async (productId: string) => {
+  const removeItem = async (productId: number) => {
     try {
       const token = localStorage.getItem('access_token');
-      if (!token) return;
-
-      const response = await api.post('/cart/remove_item/', {
-        item_id: productId
-      });
-
-      if (response.data) {
-        setItems(response.data.items.map((item: any) => ({
-          product: item.product,
-          quantity: item.quantity
-        })));
+      if (!token) {
+        return;
       }
+
+      await api.post('/cart/remove_item/', { product_id: productId });
+      setItems(items.filter(item => item.product.id !== productId));
     } catch (error) {
       console.error('Error removing item from cart:', error);
     }
   };
 
-  const updateQuantity = async (productId: string, quantity: number) => {
-    if (quantity < 1) {
-      await removeItem(productId);
-      return;
-    }
-
+  const updateQuantity = async (productId: number, quantity: number) => {
     try {
       const token = localStorage.getItem('access_token');
-      if (!token) return;
-
-      const response = await api.post('/cart/update_quantity/', {
-        item_id: productId,
-        quantity
-      });
-
-      if (response.data) {
-        setItems(response.data.items.map((item: any) => ({
-          product: item.product,
-          quantity: item.quantity
-        })));
+      if (!token) {
+        return;
       }
+
+      await api.post('/cart/update_quantity/', { product_id: productId, quantity });
+      setItems(items.map(item => 
+        item.product.id === productId 
+          ? { ...item, quantity } 
+          : item
+      ));
     } catch (error) {
       console.error('Error updating cart item quantity:', error);
     }

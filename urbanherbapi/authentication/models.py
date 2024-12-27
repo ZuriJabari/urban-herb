@@ -1,71 +1,49 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.conf import settings
 import uuid
+from django.utils import timezone
 
-class CustomUserManager(BaseUserManager):
-    def create_user(self, email=None, phone_number=None, password=None, **extra_fields):
-        if not (email or phone_number):
-            raise ValueError('Either email or phone number must be set')
-        
-        if email:
-            email = self.normalize_email(email)
-        
-        user = self.model(
-            email=email,
-            phone_number=phone_number,
-            **extra_fields
-        )
+class UserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, phone_number=None, password=None, **extra_fields):
+    def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('is_phone_verified', True)
-        extra_fields.setdefault('is_email_verified', True)
-
-        if extra_fields.get('is_staff') is not True:
-            raise ValueError('Superuser must have is_staff=True.')
-        if extra_fields.get('is_superuser') is not True:
-            raise ValueError('Superuser must have is_superuser=True.')
-
-        return self.create_user(phone_number=phone_number, password=password, **extra_fields)
+        extra_fields.setdefault('is_active', True)
+        return self.create_user(email, password, **extra_fields)
 
 class User(AbstractUser):
-    username = None  # Remove username field
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(_('email address'), unique=True, null=True, blank=True)
-    phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
-    is_phone_verified = models.BooleanField(default=False)
-    is_email_verified = models.BooleanField(default=False)
+    username = None
+    email = models.EmailField(_('email address'), unique=True, null=False, blank=False, default='')
+    phone_number = models.CharField(_('phone number'), max_length=20, unique=True, null=True, blank=True)
     first_name = models.CharField(_('first name'), max_length=150)
     last_name = models.CharField(_('last name'), max_length=150)
-    date_of_birth = models.DateField(null=True, blank=True)
+    date_of_birth = models.DateField(_('date of birth'), null=True, blank=True)
     profile_photo = models.ImageField(upload_to='profile_photos/', null=True, blank=True)
-    bio = models.TextField(max_length=500, blank=True)
-    gender = models.CharField(max_length=10, choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')], blank=True)
+    bio = models.TextField(_('bio'), max_length=500, blank=True)
+    gender = models.CharField(_('gender'), max_length=20, choices=[
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+        ('prefer_not_to_say', 'Prefer not to say')
+    ], default='prefer_not_to_say')
+    is_email_verified = models.BooleanField(_('email verified'), default=False)
+    date_joined = models.DateTimeField(_('date joined'), auto_now_add=True, editable=False)
+    last_login = models.DateTimeField(_('last login'), auto_now=True, null=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    objects = UserManager()
 
-    # Loyalty Program Fields
-    loyalty_points = models.IntegerField(default=0)
-    loyalty_tier = models.CharField(
-        max_length=20,
-        choices=[
-            ('BRONZE', 'Bronze'),
-            ('SILVER', 'Silver'),
-            ('GOLD', 'Gold'),
-            ('PLATINUM', 'Platinum')
-        ],
-        default='BRONZE'
-    )
-    referral_code = models.CharField(max_length=10, unique=True, blank=True, null=True)
-
-    objects = CustomUserManager()
-
-    USERNAME_FIELD = 'phone_number'
+    USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name']
 
     class Meta:
@@ -73,81 +51,96 @@ class User(AbstractUser):
         verbose_name_plural = _('users')
 
     def __str__(self):
-        return self.email or self.phone_number or str(self.id)
-
-    def save(self, *args, **kwargs):
-        # Generate referral code if not exists
-        if not self.referral_code:
-            self.referral_code = f'UH{str(uuid.uuid4())[:6].upper()}'
-        super().save(*args, **kwargs)
+        return self.email
 
 class Address(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='addresses')
-    street_address = models.CharField(max_length=255)
-    city = models.CharField(max_length=100)
-    district = models.CharField(max_length=100)
-    phone_number = models.CharField(max_length=15)
-    is_default = models.BooleanField(default=False)
-    label = models.CharField(max_length=50, blank=True, null=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='addresses')
+    street_address = models.CharField(_('street address'), max_length=255, default='')
+    apartment = models.CharField(_('apartment'), max_length=50, blank=True)
+    city = models.CharField(_('city'), max_length=100, default='')
+    state = models.CharField(_('state'), max_length=100, default='')
+    zip_code = models.CharField(_('zip code'), max_length=20, default='')
+    country = models.CharField(_('country'), max_length=100, default='US')
+    is_default = models.BooleanField(_('default address'), default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = _('address')
         verbose_name_plural = _('addresses')
+        ordering = ['-is_default', '-created_at']
 
     def __str__(self):
-        return f"{self.street_address}, {self.city}"
+        return f"{self.street_address}, {self.city}, {self.state}"
 
     def save(self, *args, **kwargs):
-        # If this is the first address for the user, make it default
-        if not self.pk and not self.user.addresses.exists():
-            self.is_default = True
-        # If this address is being set as default, remove default from other addresses
         if self.is_default:
-            self.user.addresses.filter(is_default=True).update(is_default=False)
+            Address.objects.filter(user=self.user, is_default=True).update(is_default=False)
         super().save(*args, **kwargs)
 
 class UserPreferences(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    LANGUAGE_CHOICES = [
+        ('en', 'English'),
+        ('es', 'Spanish'),
+        ('fr', 'French'),
+    ]
+
+    CURRENCY_CHOICES = [
+        ('USD', 'US Dollar'),
+        ('EUR', 'Euro'),
+        ('GBP', 'British Pound'),
+    ]
+
     THEME_CHOICES = [
         ('light', 'Light'),
         ('dark', 'Dark'),
-        ('system', 'System Default')
+        ('system', 'System'),
     ]
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='preferences')
-    theme = models.CharField(max_length=10, choices=THEME_CHOICES, default='system')
-    
-    # Notification Preferences
-    sms_notifications = models.BooleanField(default=True)
-    email_notifications = models.BooleanField(default=True)
-    push_notifications = models.BooleanField(default=True)
-    order_updates = models.BooleanField(default=True)
-    promotional_emails = models.BooleanField(default=True)
-    newsletter = models.BooleanField(default=True)
-    
-    # Privacy Settings
-    show_profile_photo = models.BooleanField(default=True)
-    show_online_status = models.BooleanField(default=True)
-    show_last_seen = models.BooleanField(default=True)
-    
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='preferences')
+    language = models.CharField(_('language'), max_length=10, choices=LANGUAGE_CHOICES, default='en')
+    currency = models.CharField(_('currency'), max_length=3, choices=CURRENCY_CHOICES, default='USD')
+    timezone = models.CharField(_('timezone'), max_length=50, default='UTC')
+    theme = models.CharField(_('theme'), max_length=10, choices=THEME_CHOICES, default='system')
+    email_notifications = models.BooleanField(_('email notifications'), default=True)
+    push_notifications = models.BooleanField(_('push notifications'), default=True)
+    order_updates = models.BooleanField(_('order updates'), default=True)
+    promotional_emails = models.BooleanField(_('promotional emails'), default=True)
+    newsletter = models.BooleanField(_('newsletter'), default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = _('user preference')
+        verbose_name = _('user preferences')
         verbose_name_plural = _('user preferences')
 
     def __str__(self):
-        return f"{self.user}'s preferences"
+        return f"Preferences for {self.user.email}"
+
+class VerificationCode(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(default='')
+    code = models.CharField(max_length=6, default='000000')
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = _('verification code')
+        verbose_name_plural = _('verification codes')
+
+    def __str__(self):
+        return f"{self.email} - {self.code}"
 
 class SecuritySettings(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='security_settings')
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='security_settings')
     two_factor_enabled = models.BooleanField(default=False)
     two_factor_method = models.CharField(
         max_length=20,
-        choices=[('SMS', 'SMS'), ('EMAIL', 'Email'), ('APP', 'Authenticator App')],
+        choices=[('EMAIL', 'Email'), ('APP', 'Authenticator App')],
         null=True,
         blank=True
     )
@@ -156,7 +149,6 @@ class SecuritySettings(models.Model):
     last_password_change = models.DateTimeField(auto_now_add=True)
     password_reset_required = models.BooleanField(default=False)
     account_recovery_email = models.EmailField(null=True, blank=True)
-    account_recovery_phone = models.CharField(max_length=15, null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -165,6 +157,7 @@ class SecuritySettings(models.Model):
         return f"{self.user}'s security settings"
 
 class UserActivity(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ACTIVITY_TYPES = [
         ('LOGIN', 'Login'),
         ('LOGOUT', 'Logout'),
@@ -176,7 +169,7 @@ class UserActivity(models.Model):
         ('POINTS_REDEEMED', 'Points Redeemed'),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activities')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='activities')
     activity_type = models.CharField(max_length=20, choices=ACTIVITY_TYPES)
     description = models.TextField()
     ip_address = models.GenericIPAddressField(null=True, blank=True)
@@ -193,6 +186,7 @@ class UserActivity(models.Model):
         return f"{self.user} - {self.activity_type} - {self.created_at}"
 
 class SocialConnection(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     PLATFORM_CHOICES = [
         ('FACEBOOK', 'Facebook'),
         ('GOOGLE', 'Google'),
@@ -200,7 +194,7 @@ class SocialConnection(models.Model):
         ('TWITTER', 'Twitter')
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='social_connections')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='social_connections')
     platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
     platform_user_id = models.CharField(max_length=255)
     platform_username = models.CharField(max_length=255, null=True, blank=True)
@@ -220,8 +214,9 @@ class SocialConnection(models.Model):
         return f"{self.user} - {self.platform}"
 
 class Referral(models.Model):
-    referrer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='referrals_made')
-    referred_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='referred_by')
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    referrer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='referrals_made')
+    referred_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='referred_by')
     code_used = models.CharField(max_length=10)
     points_awarded = models.IntegerField(default=0)
     is_successful = models.BooleanField(default=False)
@@ -235,17 +230,3 @@ class Referral(models.Model):
 
     def __str__(self):
         return f"{self.referrer} referred {self.referred_user}"
-
-class VerificationCode(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    phone_number = models.CharField(max_length=15, default='')
-    code = models.CharField(max_length=6)
-    is_used = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"{self.phone_number} - {self.code}"

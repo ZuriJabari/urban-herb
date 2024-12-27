@@ -36,58 +36,55 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     fetchWishlist();
   }, []);
 
-  const addItem = async (productId: string) => {
+  const addItem = async (productId: number) => {
     try {
       const token = localStorage.getItem('access_token');
       if (!token) {
-        console.log('User not authenticated');
         return;
       }
 
-      const response = await api.post('/wishlist/add_product/', {
+      await api.post('/wishlist/add_item/', {
         product_id: productId
       });
 
-      if (response.data) {
-        setItems(response.data.products.map((product: any) => ({
-          productId: product.id,
-          addedAt: new Date().toISOString()
-        })));
-      }
+      setItems([...items, {
+        productId: productId,
+        addedAt: new Date().toISOString()
+      }]);
     } catch (error) {
       console.error('Error adding item to wishlist:', error);
     }
   };
 
-  const removeItem = async (productId: string) => {
+  const removeItem = async (productId: number) => {
     try {
       const token = localStorage.getItem('access_token');
-      if (!token) return;
+      if (!token) {
+        return;
+      }
 
-      const response = await api.post('/wishlist/remove_product/', {
+      await api.post('/wishlist/remove_item/', {
         product_id: productId
       });
 
-      if (response.data) {
-        setItems(response.data.products.map((product: any) => ({
-          productId: product.id,
-          addedAt: new Date().toISOString()
-        })));
-      }
+      setItems(items.filter(item => item.productId !== productId));
     } catch (error) {
       console.error('Error removing item from wishlist:', error);
     }
   };
 
-  const moveToCart = async (productId: string) => {
+  const moveToCart = async (productId: number) => {
     try {
       const token = localStorage.getItem('access_token');
-      if (!token) return;
+      if (!token) {
+        return;
+      }
 
       await api.post('/wishlist/move_to_cart/', {
         product_id: productId
       });
-      removeItem(productId);
+
+      setItems(items.filter(item => item.productId !== productId));
     } catch (error) {
       console.error('Error moving item to cart:', error);
     }
@@ -105,7 +102,7 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const isInWishlist = (productId: string) => {
+  const isInWishlist = (productId: number) => {
     return items.some(item => item.productId === productId);
   };
 

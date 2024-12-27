@@ -1,71 +1,271 @@
-from rest_framework import viewsets, status
-from rest_framework.response import Response
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
-from django.shortcuts import get_object_or_404
-from django.core.exceptions import ValidationError
-from django.utils import timezone
-from authentication.models import User, Address, UserPreferences, VerificationCode
-from authentication.serializers import (
-    UserSerializer, AddressSerializer, PreferencesSerializer,
-    UserRegistrationSerializer, UserLoginSerializer
-)
-from twilio.rest import Client
+from django.contrib.auth import get_user_model
 from django.conf import settings
-import random
-import string
+from django.utils import timezone
+from datetime import timedelta
+import secrets
+import sendgrid
+from sendgrid.helpers.mail import Mail, Email, To, Content, TemplateId, DynamicTemplateData
+
+from ..serializers.auth_serializers import (
+    UserDetailsSerializer,
+    RegisterSerializer,
+    PhoneLoginSerializer,
+    AddressSerializer,
+    UserPreferencesSerializer
+)
+from ..models import UserPreferences, Address, VerificationCode
+
+User = get_user_model()
 
 class RegistrationViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
-    serializer_class = UserRegistrationSerializer
-
-    def create(self, request):
-        serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            
-            # Generate access and refresh tokens
+    
+    @action(detail=False, methods=['post'])
+    def register(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        
+        # Generate verification code
+        code = ''.join(secrets.choice('0123456789') for _ in range(6))
+        VerificationCode.objects.create(
+            email=user.email,
+            code=code,
+            expires_at=timezone.now() + timedelta(minutes=10)
+        )
+        
+        # Send verification email using SendGrid
+        sg = sendgrid.SendGridAPIClient(api_key=settings.EMAIL_HOST_PASSWORD)
+        from_email = Email("zurizabari@icloud.com")
+        to_email = To(user.email)
+        
+        mail = Mail(
+            from_email=from_email,
+            to_emails=to_email
+        )
+        mail.template_id = TemplateId(settings.SENDGRID_VERIFICATION_TEMPLATE_ID)
+        mail.dynamic_template_data = DynamicTemplateData({
+            'first_name': user.first_name,
+            'verification_code': code
+        })
+        
+        try:
+            sg.send(mail)
+            # Return both user data and tokens on successful registration
             refresh = RefreshToken.for_user(user)
-            tokens = {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }
-            
             return Response({
-                'user': UserSerializer(user).data,
-                'tokens': tokens
+                'message': 'Registration successful. Please verify your email.',
+                'user': serializer.data,
+                'access_token': str(refresh.access_token),
+                'refresh_token': str(refresh),
             }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            # Log the error for debugging
+            print(f"SendGrid Error: {str(e)}")
+            # Return user data even if email fails
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'message': 'Registration successful but verification email failed to send.',
+                'user': serializer.data,
+                'access_token': str(refresh.access_token),
+                'refresh_token': str(refresh),
+                'error': 'Failed to send verification email'
+            }, status=status.HTTP_201_CREATED)
 
 class LoginViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
-    serializer_class = UserLoginSerializer
+    
+    @action(detail=False, methods=['post'])
+    def login(self, request):
+        serializer = PhoneLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        email = serializer.validated_data['email']
+        password = serializer.validated_data['password']
+        
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'No user found with this email'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        if not user.check_password(password):
+            return Response(
+                {'error': 'Invalid password'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not user.is_email_verified:
+            return Response(
+                {'error': 'Please verify your email before logging in'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        
+        return Response({
+            'message': 'Login successful',
+            'user': UserDetailsSerializer(user).data,
+            'tokens': {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            }
+        })
 
-    def create(self, request):
-        serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
-            identifier = serializer.validated_data.get('email') or serializer.validated_data.get('phone_number')
-            password = serializer.validated_data['password']
-            
-            user = authenticate(username=identifier, password=password)
-            if user:
-                refresh = RefreshToken.for_user(user)
-                tokens = {
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                }
-                return Response({
-                    'user': UserSerializer(user).data,
-                    'tokens': tokens
-                })
-            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=['post'])
+    def request_password_reset(self, request):
+        serializer = PhoneLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        email = serializer.validated_data['email']
+        
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'No user found with this email'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Generate reset code
+        code = ''.join(secrets.choice('0123456789') for _ in range(6))
+        VerificationCode.objects.create(
+            email=email,
+            code=code,
+            expires_at=timezone.now() + timedelta(minutes=10)
+        )
+        
+        # Send password reset email using SendGrid
+        sg = sendgrid.SendGridAPIClient(api_key=settings.EMAIL_HOST_PASSWORD)
+        from_email = Email("zurizabari@icloud.com")
+        to_email = To(email)
+        
+        mail = Mail(
+            from_email=from_email,
+            to_emails=to_email
+        )
+        mail.template_id = TemplateId(settings.SENDGRID_PASSWORD_RESET_TEMPLATE_ID)
+        mail.dynamic_template_data = DynamicTemplateData({
+            'first_name': user.first_name,
+            'reset_code': code
+        })
+        
+        try:
+            sg.send(mail)
+            return Response({
+                'message': 'Password reset code sent to your email'
+            })
+        except Exception as e:
+            print(f"SendGrid Error: {str(e)}")
+            return Response({
+                'error': 'Failed to send password reset email',
+                'message': 'Please try again later'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'])
+    def verify_email(self, request):
+        serializer = PhoneLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        email = serializer.validated_data['email']
+        code = serializer.validated_data['code']
+        
+        try:
+            verification = VerificationCode.objects.filter(
+                email=email,
+                code=code,
+                is_used=False,
+                expires_at__gt=timezone.now()
+            ).latest('created_at')
+        except VerificationCode.DoesNotExist:
+            return Response(
+                {'error': 'Invalid or expired verification code'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user = User.objects.get(email=email)
+        user.is_email_verified = True
+        user.save()
+        
+        verification.is_used = True
+        verification.save()
+        
+        # Send welcome email
+        sg = sendgrid.SendGridAPIClient(api_key=settings.EMAIL_HOST_PASSWORD)
+        from_email = Email("zurizabari@icloud.com")
+        to_email = To(email)
+        
+        mail = Mail(
+            from_email=from_email,
+            to_emails=to_email
+        )
+        mail.template_id = TemplateId(settings.SENDGRID_WELCOME_TEMPLATE_ID)
+        mail.dynamic_template_data = DynamicTemplateData({
+            'first_name': user.first_name,
+            'login_url': 'http://localhost:5173/login'
+        })
+        
+        try:
+            sg.send(mail)
+        except Exception as e:
+            print(f"SendGrid Error: {str(e)}")
+            # Don't return error response here, just log it
+            # as this is not critical for the verification process
+        
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        
+        return Response({
+            'message': 'Email verified successfully',
+            'user': UserDetailsSerializer(user).data,
+            'access_token': str(refresh.access_token),
+            'refresh_token': str(refresh),
+        })
+
+    @action(detail=False, methods=['post'])
+    def reset_password(self, request):
+        serializer = PhoneLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        email = serializer.validated_data['email']
+        code = serializer.validated_data['code']
+        new_password = serializer.validated_data['new_password']
+        
+        try:
+            verification = VerificationCode.objects.filter(
+                email=email,
+                code=code,
+                is_used=False,
+                expires_at__gt=timezone.now()
+            ).latest('created_at')
+        except VerificationCode.DoesNotExist:
+            return Response(
+                {'error': 'Invalid or expired reset code'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user = User.objects.get(email=email)
+        user.set_password(new_password)
+        user.save()
+        
+        verification.is_used = True
+        verification.save()
+        
+        return Response({
+            'message': 'Password reset successful'
+        })
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
-    serializer_class = UserSerializer
+    serializer_class = UserDetailsSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -90,47 +290,29 @@ class AddressViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Only allow users to see their own addresses"""
         return Address.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        """Set the user when creating a new address"""
         serializer.save(user=self.request.user)
 
 class PreferencesViewSet(viewsets.ModelViewSet):
-    serializer_class = PreferencesSerializer
+    serializer_class = UserPreferencesSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Only allow users to see their own preferences"""
         return UserPreferences.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        """Set the user when creating preferences"""
         serializer.save(user=self.request.user)
 
-    @action(detail=False, methods=['patch'])
-    def me(self, request):
-        """Update the authenticated user's preferences"""
-        try:
-            preferences = self.get_queryset().get()
-            serializer = self.get_serializer(preferences, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except UserPreferences.DoesNotExist:
-            # If preferences don't exist, create them
-            serializer = self.get_serializer(data=request.data)
-            if serializer.is_valid():
-                serializer.save(user=request.user)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def get_object(self):
+        return self.get_queryset().first()
 
-class PhoneVerificationView(viewsets.ViewSet):
+class PhoneVerificationViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
 
-    def create(self, request):
+    @action(detail=False, methods=['post'])
+    def send_code(self, request):
         phone_number = request.data.get('phone_number')
         is_registration = request.data.get('is_registration', False)
         
@@ -146,7 +328,7 @@ class PhoneVerificationView(viewsets.ViewSet):
                     return Response({'error': 'No user found with this phone number'}, status=status.HTTP_404_NOT_FOUND)
 
             # Generate verification code
-            code = ''.join(random.choices(string.digits, k=6))
+            code = ''.join(secrets.choice('0123456789') for _ in range(6))
             
             # Save verification code
             verification = VerificationCode.objects.create(
@@ -188,10 +370,8 @@ class PhoneVerificationView(viewsets.ViewSet):
                 'detail': 'Error occurred while processing verification'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class VerifyPhoneView(viewsets.ViewSet):
-    permission_classes = [AllowAny]
-
-    def create(self, request):
+    @action(detail=False, methods=['post'])
+    def verify(self, request):
         phone_number = request.data.get('phone_number')
         code = request.data.get('code')
         is_registration = request.data.get('is_registration', False)
@@ -203,7 +383,7 @@ class VerifyPhoneView(viewsets.ViewSet):
             )
 
         try:
-            # Verify code
+            # Find the verification code
             verification = VerificationCode.objects.filter(
                 phone_number=phone_number,
                 code=code,
@@ -212,37 +392,45 @@ class VerifyPhoneView(viewsets.ViewSet):
             ).first()
 
             if not verification:
-                return Response({'error': 'Invalid or expired code'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {'error': 'Invalid or expired verification code'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-            # Mark code as used
+            # Mark the code as used
             verification.is_used = True
             verification.save()
 
-            # Handle registration vs login
+            # For registration, create a new user
             if is_registration:
-                # For registration, create new user
-                user = User.objects.create_user(
+                user, created = User.objects.get_or_create(
                     phone_number=phone_number,
-                    is_phone_verified=True
+                    defaults={
+                        'is_phone_verified': True
+                    }
                 )
+                if not created:
+                    user.is_phone_verified = True
+                    user.save()
             else:
-                # For login, get existing user
+                # For login, just verify the existing user's phone
                 try:
                     user = User.objects.get(phone_number=phone_number)
-                    if not user.is_phone_verified:
-                        user.is_phone_verified = True
-                        user.save()
+                    user.is_phone_verified = True
+                    user.save()
                 except User.DoesNotExist:
-                    return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+                    return Response(
+                        {'error': 'No user found with this phone number'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
 
-            # Generate tokens
-            refresh = RefreshToken.for_user(user)
-            
             return Response({
-                'user': UserSerializer(user).data,
-                'access': str(refresh.access_token),
-                'refresh': str(refresh)
+                'message': 'Phone number verified successfully',
+                'is_registration': is_registration
             })
 
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                'error': str(e),
+                'detail': 'Error occurred while verifying phone number'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

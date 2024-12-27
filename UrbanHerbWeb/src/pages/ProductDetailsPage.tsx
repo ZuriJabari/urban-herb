@@ -2,231 +2,297 @@ import {
   Box,
   Container,
   Grid,
-  Heading,
-  Text,
   Image,
+  Text,
   Button,
-  Stack,
+  VStack,
+  HStack,
   Badge,
   Icon,
-  useColorModeValue,
+  Heading,
   Tabs,
   TabList,
-  Tab,
   TabPanels,
+  Tab,
   TabPanel,
   List,
   ListItem,
   ListIcon,
   useToast,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react';
-import { MdCheckCircle } from 'react-icons/md';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from 'react-query';
+import { FaLeaf, FaCheck, FaHeart, FaShoppingCart, FaStar } from 'react-icons/fa';
+import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Product } from '../types/product';
 import { useCart } from '../contexts/CartContext';
 import { useWishlist } from '../contexts/WishlistContext';
-import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { ProductRecommendations } from '../components/ProductRecommendations';
+import { Reviews } from '../components/Reviews';
 import LoadingSpinner from '../components/LoadingSpinner';
 import api from '../services/api';
-import axios from 'axios';
+import { useState, useEffect } from 'react';
 
-const ProductDetailsPage = () => {
+export const ProductDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { addItem } = useCart();
+  const { addItem: addToWishlist, removeItem: removeFromWishlist, isInWishlist } = useWishlist();
   const toast = useToast();
-  const { addToCart } = useCart();
-  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
-  const [selectedImage, setSelectedImage] = useState(0);
 
-  const { data: product, isLoading, isError, error } = useQuery(
-    ['product', id],
-    async () => {
-      try {
-        const response = await api.get<Product>(`/products/products/${id}/`);
-        return response.data; // Data is already transformed by the interceptor
-      } catch (error) {
-        console.error('Error fetching product:', error);
-        if (axios.isAxiosError(error)) {
-          console.error('Response:', error.response?.data);
-          console.error('Status:', error.response?.status);
-        }
-        throw error;
+  useEffect(() => {
+    const fetchProduct = async () => {
+      if (!id) {
+        console.error('No product ID provided');
+        setError('Invalid product ID');
+        return;
       }
-    },
-    {
-      enabled: !!id,
-      retry: 1
-    }
-  );
+      
+      try {
+        setIsLoading(true);
+        console.log('Fetching product with ID:', id);
+        const response = await api.get(`/api/v1/products/${id}/`);
+        console.log('Raw API response:', response);
+        
+        if (!response.data) {
+          console.error('No data in API response');
+          setError('Failed to load product details - no data received');
+          return;
+        }
 
+        console.log('Setting product data:', response.data);
+        setProduct(response.data);
+      } catch (err) {
+        console.error('Failed to fetch product:', err);
+        console.error('Error details:', {
+          message: err.message,
+          status: err.response?.status,
+          data: err.response?.data,
+          config: err.config
+        });
+        setError('Failed to load product details');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    console.log('ProductDetailsPage mounted with ID:', id);
+    fetchProduct();
+  }, [id]);
+
+  // Early return if no ID
+  if (!id) {
+    console.log('Rendering: No product ID');
+    return (
+      <Container maxW="container.xl" py={8}>
+        <Alert status="error">
+          <AlertIcon />
+          Invalid product ID
+        </Alert>
+      </Container>
+    );
+  }
+
+  // Show loading state
   if (isLoading) {
-    return <LoadingSpinner text="Loading product details..." />;
-  }
-
-  if (isError) {
+    console.log('Rendering: Loading state');
     return (
-      <Container maxW="container.xl" py={10}>
-        <Stack spacing={4} align="center">
-          <Heading size="lg" color="red.500">Error Loading Product</Heading>
-          <Text>We couldn't find the product you're looking for.</Text>
-          <Button onClick={() => navigate('/')}>
-            Return to Home
-          </Button>
-        </Stack>
+      <Container maxW="container.xl" py={8}>
+        <LoadingSpinner />
       </Container>
     );
   }
 
-  if (!product) {
+  // Show error state
+  if (error || !product) {
+    console.log('Rendering: Error state', { error, product });
     return (
-      <Container maxW="container.xl" py={10}>
-        <Stack spacing={4} align="center">
-          <Heading size="lg">Product Not Found</Heading>
-          <Text>The product you're looking for doesn't exist.</Text>
-          <Button onClick={() => navigate('/')}>
-            Return to Home
-          </Button>
-        </Stack>
+      <Container maxW="container.xl" py={8}>
+        <Alert status="error">
+          <AlertIcon />
+          {error || 'Product not found'}
+        </Alert>
       </Container>
     );
   }
+
+  console.log('Rendering: Product details', product);
 
   const handleAddToCart = () => {
-    addToCart(product);
+    if (!product) return;
+    
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.images?.[0]?.image || '',
+      quantity: 1
+    });
+    
     toast({
-      title: 'Added to Cart',
-      description: `${product.name} has been added to your cart.`,
+      title: 'Added to cart',
+      description: `${product.name} has been added to your cart`,
       status: 'success',
-      duration: 3000,
+      duration: 2000,
       isClosable: true,
     });
   };
 
-  const handleWishlist = () => {
+  const toggleWishlist = () => {
+    if (!product) return;
+    
     if (isInWishlist(product.id)) {
       removeFromWishlist(product.id);
       toast({
-        title: 'Removed from Wishlist',
-        description: `${product.name} has been removed from your wishlist.`,
+        title: 'Removed from wishlist',
         status: 'info',
-        duration: 3000,
-        isClosable: true,
+        duration: 2000,
       });
     } else {
       addToWishlist(product);
       toast({
-        title: 'Added to Wishlist',
-        description: `${product.name} has been added to your wishlist.`,
+        title: 'Added to wishlist',
         status: 'success',
-        duration: 3000,
-        isClosable: true,
+        duration: 2000,
       });
     }
   };
 
   return (
-    <Container maxW="container.xl" py={10}>
-      <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={10}>
-        {/* Product Images */}
+    <Container maxW="container.xl" py={8}>
+      <Box mb={8}>
+        <RouterLink to="/">← Back to Products</RouterLink>
+      </Box>
+
+      <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={8} mb={12}>
         <Box>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <Image
-              src={product.images[selectedImage]}
-              alt={product.name}
-              w="full"
-              h="400px"
-              objectFit="cover"
-              borderRadius="lg"
-              mb={4}
-            />
-          </motion.div>
-          <Stack direction="row" spacing={4} overflowX="auto" py={2}>
-            {product.images.map((image, index) => (
-              <Image
-                key={index}
-                src={image}
-                alt={`${product.name} thumbnail ${index + 1}`}
-                w="100px"
-                h="100px"
-                objectFit="cover"
-                borderRadius="md"
-                cursor="pointer"
-                opacity={selectedImage === index ? 1 : 0.6}
-                onClick={() => setSelectedImage(index)}
-                _hover={{ opacity: 1 }}
-              />
-            ))}
-          </Stack>
+          <Image
+            src={product.images?.[0]?.image || '/placeholder-image.jpg'}
+            alt={product.name}
+            borderRadius="lg"
+            objectFit="cover"
+            width="100%"
+            height="400px"
+          />
         </Box>
 
-        {/* Product Info */}
-        <Box>
-          <Stack spacing={4}>
-            <Heading size="xl">{product.name}</Heading>
-            <Text fontSize="2xl" color="green.500" fontWeight="bold">
-              ${product.price.toFixed(2)}
-            </Text>
-            {product.discountPrice && (
-              <Text as="s" color="gray.500">
-                ${product.discountPrice.toFixed(2)}
-              </Text>
+        <VStack align="start" spacing={4}>
+          <Badge colorScheme="green" fontSize="sm">{product.category}</Badge>
+          <Heading as="h1" size="xl">{product.name}</Heading>
+          
+          <HStack>
+            <Icon as={FaStar} color="yellow.400" />
+            <Text fontWeight="bold">{product.average_rating || 0}</Text>
+            <Text color="gray.500">({product.total_reviews || 0} reviews)</Text>
+            {product.lab_tested && (
+              <Badge colorScheme="green" display="flex" alignItems="center">
+                <Icon as={FaCheck} mr={1} /> Lab Tested
+              </Badge>
             )}
-            <Text>{product.description}</Text>
+          </HStack>
 
-            <Stack direction="row" spacing={4}>
-              <Button
-                size="lg"
-                colorScheme="green"
-                leftIcon={<Icon as={MdCheckCircle} />}
-                onClick={handleAddToCart}
-              >
-                Add to Cart
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={handleWishlist}
-              >
-                {isInWishlist(product.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
-              </Button>
-            </Stack>
+          <HStack spacing={4} alignItems="center">
+            <Text fontSize="2xl" fontWeight="bold">
+              ${product.price}
+            </Text>
+          </HStack>
 
-            <Tabs isFitted variant="enclosed" mt={6}>
-              <TabList mb="1em">
-                <Tab>Details</Tab>
-                <Tab>Specifications</Tab>
-                <Tab>Reviews</Tab>
-              </TabList>
-              <TabPanels>
-                <TabPanel>
-                  <Text>{product.description}</Text>
-                </TabPanel>
-                <TabPanel>
-                  <List spacing={3}>
-                    {product.specifications?.map((spec, index) => (
-                      <ListItem key={index}>
-                        <ListIcon as={MdCheckCircle} color="green.500" />
-                        {spec}
-                      </ListItem>
-                    ))}
-                  </List>
-                </TabPanel>
-                <TabPanel>
-                  <Text>Reviews coming soon...</Text>
-                </TabPanel>
-              </TabPanels>
-            </Tabs>
-          </Stack>
-        </Box>
+          <Text>{product.description}</Text>
+
+          {product.effects && (
+            <HStack spacing={2} flexWrap="wrap">
+              {product.cbd_content && (
+                <Badge colorScheme="purple">{product.cbd_content} CBD</Badge>
+              )}
+              {product.effects.map((effect) => (
+                <Badge key={effect} colorScheme="blue">
+                  {effect}
+                </Badge>
+              ))}
+            </HStack>
+          )}
+
+          <HStack spacing={4} width="100%">
+            <Button
+              colorScheme="green"
+              size="lg"
+              leftIcon={<Icon as={FaShoppingCart} />}
+              flex={1}
+              onClick={handleAddToCart}
+            >
+              Add to Cart
+            </Button>
+            <Button
+              colorScheme={isInWishlist(product.id) ? 'red' : 'gray'}
+              size="lg"
+              leftIcon={<Icon as={FaHeart} />}
+              onClick={toggleWishlist}
+            >
+              {isInWishlist(product.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
+            </Button>
+          </HStack>
+        </VStack>
       </Grid>
+
+      <Tabs>
+        <TabList>
+          <Tab>Details</Tab>
+          <Tab>Reviews ({product.total_reviews || 0})</Tab>
+        </TabList>
+
+        <TabPanels>
+          <TabPanel>
+            <VStack align="start" spacing={4}>
+              {product.brand && (
+                <Box>
+                  <Heading size="md">Brand</Heading>
+                  <Text>{product.brand.name}</Text>
+                </Box>
+              )}
+              
+              {product.strain && (
+                <Box>
+                  <Heading size="md">Strain</Heading>
+                  <Text>{product.strain}</Text>
+                </Box>
+              )}
+
+              {(product.thc_content || product.cbd_content) && (
+                <Box>
+                  <Heading size="md">Content</Heading>
+                  <List spacing={2}>
+                    {product.thc_content && (
+                      <ListItem>
+                        <ListIcon as={FaLeaf} color="green.500" />
+                        THC: {product.thc_content}
+                      </ListItem>
+                    )}
+                    {product.cbd_content && (
+                      <ListItem>
+                        <ListIcon as={FaLeaf} color="green.500" />
+                        CBD: {product.cbd_content}
+                      </ListItem>
+                    )}
+                  </List>
+                </Box>
+              )}
+            </VStack>
+          </TabPanel>
+          
+          <TabPanel>
+            <Reviews productId={product.id} reviews={product.reviews || []} />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
+
+      <Box mt={12}>
+        <Heading size="lg" mb={6}>You might also like</Heading>
+        <ProductRecommendations currentProductId={product.id} category={product.category} />
+      </Box>
     </Container>
   );
 };
-
-export default ProductDetailsPage;

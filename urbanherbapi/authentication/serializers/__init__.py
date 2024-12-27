@@ -1,9 +1,27 @@
-from .user_serializers import (
-    UserProfileSerializer, UserPreferencesSerializer,
-    SecuritySettingsSerializer, UserActivitySerializer,
-    SocialConnectionSerializer, ReferralSerializer
-)
 from .auth_serializers import (
-    UserSerializer, AddressSerializer, PreferencesSerializer,
-    UserRegistrationSerializer, UserLoginSerializer
+    UserDetailsSerializer,
+    RegisterSerializer,
+    PhoneLoginSerializer,
+    AddressSerializer,
+    UserPreferencesSerializer
 )
+from .user_serializers import (
+    UserProfileSerializer, 
+    SecuritySettingsSerializer, 
+    UserActivitySerializer,
+    SocialConnectionSerializer, 
+    ReferralSerializer
+)
+
+__all__ = [
+    'UserProfileSerializer', 
+    'UserPreferencesSerializer',
+    'SecuritySettingsSerializer', 
+    'UserActivitySerializer',
+    'SocialConnectionSerializer', 
+    'ReferralSerializer',
+    'UserDetailsSerializer',
+    'RegisterSerializer',
+    'PhoneLoginSerializer',
+    'AddressSerializer'
+]

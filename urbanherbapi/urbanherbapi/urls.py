@@ -54,10 +54,15 @@ def api_root(request, format=None):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', api_root, name='api-root'),
-    path('api/v1/', include('authentication.urls')),  
+    
+    # API URLs
+    path('api/v1/', include('authentication.urls')),
     path('api/v1/products/', include('products.urls')),
+    
+    # Health Check
     path('api/health-check/', api_view(['GET'])(lambda request: Response({'status': 'ok'})), name='health-check'),
-    # Swagger URLs
+    
+    # Documentation
     path('api/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('api/swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('api/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),

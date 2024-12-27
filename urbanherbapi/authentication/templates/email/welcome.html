@@ -1,0 +1,25 @@
+{% extends "email/base_email.html" %}
+
+{% block content %}
+<h1>Welcome to UrbanHerb!</h1>
+<p>Hi {{ user.first_name }},</p>
+<p>Thank you for joining UrbanHerb! We're excited to have you as part of our community.</p>
+<p>To get started, please verify your email address by clicking the button below:</p>
+
+<a href="{{ verification_url }}" class="button">Verify Email Address</a>
+
+<p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+<p>{{ verification_url }}</p>
+
+<p>At UrbanHerb, you can:</p>
+<ul>
+    <li>Browse our selection of premium herbs and spices</li>
+    <li>Learn about traditional medicinal uses</li>
+    <li>Connect with other herb enthusiasts</li>
+    <li>Get personalized recommendations</li>
+</ul>
+
+<p>If you have any questions, feel free to reach out to our support team.</p>
+
+<p>Best regards,<br>The UrbanHerb Team</p>
+{% endblock %}

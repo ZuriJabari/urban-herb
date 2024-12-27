@@ -149,25 +149,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (data: RegisterData) => {
     dispatch({ type: 'AUTH_START' });
     try {
-      // Register the user
       const response = await authApi.register(data);
       
-      dispatch({
-        type: 'AUTH_SUCCESS',
-        payload: {
-          user: response.data.user,
-          access: response.data.access,
-          refresh: response.data.refresh,
-        },
-      });
-      
-      // Navigate to verify phone
-      navigate('/verify-phone', { state: { phone_number: data.phone_number } });
+      // Check if we have a user in the response
+      if (response.data.user) {
+        dispatch({
+          type: 'AUTH_SUCCESS',
+          payload: {
+            user: response.data.user,
+            access: response.data.access_token,
+            refresh: response.data.refresh_token,
+          },
+        });
+        
+        // Even if email verification fails, we should still redirect
+        // since the user account was created successfully
+        navigate('/verify-email');
+        
+        // If there's an email error, we can show it as a toast or notification
+        if (response.data.error === 'Failed to send verification email') {
+          console.warn('Email verification failed to send');
+          // You might want to add a toast notification here
+        }
+      } else {
+        throw new Error('Registration failed: No user data received');
+      }
     } catch (error: any) {
       console.error('Registration error:', error.response?.data);
+      const errorMessage = error.response?.data?.detail || 
+                       error.response?.data?.non_field_errors?.[0] ||
+                       error.response?.data?.error ||
+                       'Registration failed';
       dispatch({
         type: 'AUTH_FAILURE',
-        payload: error.response?.data?.error || error.response?.data?.phone_number?.[0] || 'Registration failed',
+        payload: errorMessage,
       });
       throw error;
     }
@@ -181,8 +196,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         type: 'AUTH_SUCCESS',
         payload: {
           user: response.data.user,
-          access: response.data.access,
-          refresh: response.data.refresh,
+          access: response.data.access_token,
+          refresh: response.data.refresh_token,
         },
       });
       navigate('/');
@@ -191,6 +206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         type: 'AUTH_FAILURE',
         payload: error.response?.data?.detail || 'Login failed',
       });
+      throw error;
     }
   };
 
@@ -217,21 +233,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authApi.verifyPhone(data);
       console.log('Verify phone response:', response.data);  // Debug log
       
-      if (!response.data.access || !response.data.refresh) {
+      if (!response.data.access_token || !response.data.refresh_token) {
         throw new Error('Invalid response format from server');
       }
       
       // Save tokens to localStorage
-      localStorage.setItem('access_token', response.data.access);
-      localStorage.setItem('refresh_token', response.data.refresh);
+      localStorage.setItem('access_token', response.data.access_token);
+      localStorage.setItem('refresh_token', response.data.refresh_token);
       
       // Update auth state
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: {
           user: response.data.user,
-          access: response.data.access,
-          refresh: response.data.refresh,
+          access: response.data.access_token,
+          refresh: response.data.refresh_token,
         },
       });
       

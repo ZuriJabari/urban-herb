@@ -49,13 +49,19 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
     
     # Third party apps
     'rest_framework',
+    'rest_framework.authtoken',  
     'rest_framework_simplejwt',
     'corsheaders',
     'drf_yasg',
-    'django_filters',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',  # Required by dj-rest-auth
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
     
     # Local apps
     'authentication',
@@ -63,14 +69,15 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'urbanherbapi.urls'
@@ -108,13 +115,25 @@ DATABASES = {
     }
 }
 
-# Email Configuration
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+# SendGrid Settings
+SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
+SENDGRID_FROM_EMAIL = 'zurizabari@icloud.com'
+
+# SendGrid Template IDs
+SENDGRID_WELCOME_TEMPLATE_ID = 'd-deb52368b88a4cd3a6c09a05fcb91694'
+SENDGRID_VERIFICATION_TEMPLATE_ID = 'd-c477f74dbafd4a1b86169a1b4f7aac6c'
+SENDGRID_PASSWORD_RESET_TEMPLATE_ID = 'd-e0655b56f5854d5d9fb66da38cba12ba'
+
+# URLs for email templates
+PRIVACY_POLICY_URL = os.getenv('PRIVACY_POLICY_URL', 'https://urbanherb.com/privacy')
+TERMS_URL = os.getenv('TERMS_URL', 'https://urbanherb.com/terms')
+
+# Email Backend Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.sendgrid.net'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'apikey'
 
 # JWT Settings
 SIMPLE_JWT = {
@@ -128,22 +147,39 @@ SIMPLE_JWT = {
 }
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', 
-    ','.join([
-        f'http://localhost:{port}' for port in range(8000, 8011)
-    ] + [
-        f'http://127.0.0.1:{port}' for port in range(8000, 8011)
-    ] + ['http://localhost:5173', 'http://127.0.0.1:5173']
-)).split(',')
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5173',  # Vite dev server
+    'http://127.0.0.1:5173',
 ]
+CORS_ALLOW_CREDENTIALS = True
+CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# CSRF settings
+CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_COOKIE_SECURE = False  # Set to True in production
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
+CSRF_USE_SESSIONS = False
+
+# Session settings
+SESSION_COOKIE_SECURE = False  # Set to True in production
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
 
 # Swagger/OpenAPI settings
 SWAGGER_SETTINGS = {
@@ -204,36 +240,34 @@ LOGGING = {
         },
     },
     'handlers': {
-        'file': {
-            'level': os.getenv('LOG_LEVEL', 'INFO'),
-            'class': 'logging.FileHandler',
-            'filename': os.getenv('LOG_FILE', 'debug.log'),
+        'console': {
+            'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'console': {
-            'level': os.getenv('LOG_LEVEL', 'INFO'),
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'formatter': 'verbose',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['file', 'console'],
-            'level': os.getenv('LOG_LEVEL', 'INFO'),
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
             'propagate': True,
         },
         'authentication': {
-            'handlers': ['file', 'console'],
-            'level': os.getenv('LOG_LEVEL', 'INFO'),
-            'propagate': True,
-        },
-        'products': {
-            'handlers': ['file', 'console'],
-            'level': os.getenv('LOG_LEVEL', 'INFO'),
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
             'propagate': True,
         },
     },
 }
+
+# Create logs directory if it doesn't exist
+LOGS_DIR = os.path.join(BASE_DIR, 'logs')
+if not os.path.exists(LOGS_DIR):
+    os.makedirs(LOGS_DIR)
 
 # Feature Flags
 ENABLE_USER_REGISTRATION = os.getenv('ENABLE_USER_REGISTRATION', 'True').lower() == 'true'
@@ -243,21 +277,52 @@ ENABLE_PHONE_VERIFICATION = os.getenv('ENABLE_PHONE_VERIFICATION', 'False').lowe
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Rest Framework settings
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
-    ),
+# Django AllAuth settings
+ACCOUNT_ADAPTER = 'authentication.adapters.CustomAccountAdapter'
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+ACCOUNT_CONFIRM_EMAIL_ON_GET = True
+ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 1
+ACCOUNT_LOGIN_ATTEMPTS_LIMIT = 5
+ACCOUNT_LOGIN_ATTEMPTS_TIMEOUT = 300
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+
+# REST Auth settings
+REST_AUTH = {
+    'USE_JWT': True,
+    'JWT_AUTH_COOKIE': 'access_token',
+    'JWT_AUTH_REFRESH_COOKIE': 'refresh_token',
+    'JWT_AUTH_HTTPONLY': False,
+    'SESSION_LOGIN': False,
+    'USER_DETAILS_SERIALIZER': 'authentication.serializers.auth_serializers.UserDetailsSerializer',
+    'REGISTER_SERIALIZER': 'authentication.serializers.auth_serializers.RegisterSerializer',
 }
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+# dj-rest-auth settings
+REST_USE_JWT = True
+JWT_AUTH_COOKIE = 'urban-herb-auth'
+JWT_AUTH_REFRESH_COOKIE = 'urban-herb-refresh'
 
 # Custom user model
 AUTH_USER_MODEL = 'authentication.User'
 
-# Authentication Backends
+# Authentication settings
 AUTHENTICATION_BACKENDS = [
-    'authentication.backends.EmailOrPhoneBackend',
     'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
 ]

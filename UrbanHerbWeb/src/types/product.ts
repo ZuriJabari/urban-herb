@@ -3,25 +3,33 @@ export type ProductCategory =
   | 'EDIBLES' 
   | 'CONCENTRATES' 
   | 'VAPES' 
-  | 'PRE_ROLLS' 
   | 'TINCTURES' 
   | 'TOPICALS'
-  | 'CAPSULES';
+  | 'ACCESSORIES'
+  | 'PRE_ROLLS'
+  | 'SEEDS';
 
 export type ProductEffect = 
-  | 'RELAXING' 
-  | 'ENERGIZING' 
-  | 'CREATIVE' 
-  | 'FOCUSED' 
-  | 'CALMING';
+  | 'RELAXING'
+  | 'ENERGIZING'
+  | 'CREATIVE'
+  | 'SLEEPY'
+  | 'FOCUSED'
+  | 'UPLIFTED'
+  | 'HAPPY'
+  | 'PAIN_RELIEF'
+  | 'STRESS_RELIEF'
+  | 'ANXIETY_RELIEF';
 
 export type StrainType = 
-  | 'INDICA'
   | 'SATIVA'
-  | 'HYBRID';
+  | 'INDICA'
+  | 'HYBRID'
+  | 'CBD'
+  | 'NA';
 
 export interface Brand {
-  id: string;
+  id: number;
   name: string;
   description: string;
   logo?: string;
@@ -31,42 +39,42 @@ export interface Brand {
 }
 
 export interface Review {
-  id: string;
-  user_name: string;
+  id: number;
+  user: number;
+  user_email: string;
   rating: number;
   title: string;
-  comment: string;
+  content: string;
   created_at: string;
 }
 
 export interface ProductImage {
-  id: string;
+  id: number;
   image: string;
-  alt_text?: string;
+  alt_text: string;
   is_primary: boolean;
   created_at: string;
+  product: number;
 }
 
 export interface Product {
-  id: string;
+  id: number;
   name: string;
   description: string;
-  price: number;
-  image?: string;
+  price: string;
   category: ProductCategory;
-  strain?: StrainType;
-  thc_content?: string;
-  cbd_content?: string;
+  brand: Brand;
+  strain: StrainType;
+  thc_content: string;
+  cbd_content: string;
   effects: ProductEffect[];
   benefits: string[];
-  stock: number;
-  rating: number;
-  review_count: number;
-  brand: Brand;
   lab_tested: boolean;
-  weight?: string;
-  dosage?: string;
-  additional_images?: ProductImage[];
-  reviews?: Review[];
+  stock: number;
+  images: ProductImage[];
+  reviews: Review[];
+  average_rating: number;
+  total_reviews: number;
   created_at: string;
+  updated_at: string;
 }

@@ -1,6 +1,17 @@
-from .user_views import UserProfileViewSet
 from .auth_views import (
-    RegistrationViewSet, LoginViewSet, UserViewSet,
-    AddressViewSet, PreferencesViewSet,
-    PhoneVerificationView, VerifyPhoneView
+    RegistrationViewSet,
+    LoginViewSet,
+    UserViewSet,
+    AddressViewSet,
+    PreferencesViewSet,
+    PhoneVerificationViewSet
 )
+
+__all__ = [
+    'RegistrationViewSet',
+    'LoginViewSet',
+    'UserViewSet',
+    'AddressViewSet',
+    'PreferencesViewSet',
+    'PhoneVerificationViewSet',
+]

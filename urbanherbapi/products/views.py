@@ -41,6 +41,12 @@ class ProductViewSet(viewsets.ModelViewSet):
     ordering_fields = ['price', 'rating', 'created_at']
     ordering = ['-created_at']
 
+    def get_queryset(self):
+        queryset = Product.objects.all().prefetch_related(
+            'images', 'reviews', 'brand'
+        ).select_related('brand')
+        return queryset
+
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return ProductCreateUpdateSerializer

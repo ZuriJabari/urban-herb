@@ -5,12 +5,14 @@ import { Layout } from './components/Layout';
 import HomePage from './pages/HomePage';
 import CartPage from './pages/CartPage';
 import WishlistPage from './pages/WishlistPage';
-import ProductDetailsPage from './pages/ProductDetailsPage';
+import { ProductDetailsPage } from './pages/ProductDetailsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import VerifyPhonePage from './pages/VerifyPhonePage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 import PasswordRecoveryPage from './pages/PasswordRecoveryPage';
 import ProfilePage from './pages/ProfilePage';
+import SocialAuthCallback from './pages/SocialAuthCallback';
 import { SearchProvider } from './contexts/SearchContext';
 import { WishlistProvider } from './contexts/WishlistContext';
 import { CartProvider } from './contexts/CartContext';
@@ -63,8 +65,12 @@ const App = () => {
                           <Route path="/" element={<HomePage />} />
                           <Route path="/login" element={<LoginPage />} />
                           <Route path="/register" element={<RegisterPage />} />
+                          <Route path="/verify-email" element={<VerifyEmailPage />} />
                           <Route path="/verify-phone" element={<VerifyPhonePage />} />
                           <Route path="/password-recovery" element={<PasswordRecoveryPage />} />
+                          <Route path="/auth/callback" element={<SocialAuthCallback />} />
+                          <Route path="/products" element={<HomePage />} />
+                          <Route path="/products/:id" element={<ProductDetailsPage />} />
                           <Route
                             path="/cart"
                             element={
@@ -89,7 +95,6 @@ const App = () => {
                               </PrivateRoute>
                             }
                           />
-                          <Route path="/product/:id" element={<ProductDetailsPage />} />
                         </Routes>
                       </Suspense>
                     </Layout>

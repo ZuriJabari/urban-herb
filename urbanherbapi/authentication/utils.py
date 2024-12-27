@@ -43,30 +43,53 @@ def create_verification_code(user, type='phone', identifier=None):
 
 def send_otp_via_sms(phone_number, code):
     """Send OTP via SMS."""
-    # Development mode - just print the OTP
-    if not TWILIO_AVAILABLE or settings.DEBUG:
+    logger.info(f"Attempting to send OTP to {phone_number}")
+    
+    # Check if Twilio is available
+    if not TWILIO_AVAILABLE:
+        logger.warning("Twilio package is not installed")
         logger.info(f"Development mode: OTP for {phone_number} is {code}")
         return True, f"Development mode: OTP is {code}"
 
-    # Check if Twilio credentials are configured
-    if not all([
-        getattr(settings, 'TWILIO_ACCOUNT_SID', None),
-        getattr(settings, 'TWILIO_AUTH_TOKEN', None),
-        getattr(settings, 'TWILIO_PHONE_NUMBER', None)
-    ]):
-        logger.info("Twilio credentials not properly configured. Using development mode.")
+    # Check if we're in DEBUG mode
+    if settings.DEBUG:
+        logger.info("Running in DEBUG mode")
+        logger.info(f"Development mode: OTP for {phone_number} is {code}")
+        return True, f"Development mode: OTP is {code}"
+
+    # Check Twilio credentials
+    twilio_sid = getattr(settings, 'TWILIO_ACCOUNT_SID', None)
+    twilio_token = getattr(settings, 'TWILIO_AUTH_TOKEN', None)
+    twilio_phone = getattr(settings, 'TWILIO_PHONE_NUMBER', None)
+
+    if not twilio_sid:
+        logger.error("TWILIO_ACCOUNT_SID not configured")
+    if not twilio_token:
+        logger.error("TWILIO_AUTH_TOKEN not configured")
+    if not twilio_phone:
+        logger.error("TWILIO_PHONE_NUMBER not configured")
+
+    if not all([twilio_sid, twilio_token, twilio_phone]):
+        logger.warning("Twilio credentials not properly configured, falling back to development mode")
         logger.info(f"Development mode: OTP for {phone_number} is {code}")
         return True, f"Development mode: OTP is {code}"
 
     try:
         # Production mode - use Twilio
-        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        logger.info("Initializing Twilio client")
+        client = Client(twilio_sid, twilio_token)
+        
+        logger.info(f"Sending SMS from {twilio_phone} to {phone_number}")
         message = client.messages.create(
             body=f'Your UrbanHerb verification code is: {code}. This code will expire in 5 minutes.',
-            from_=settings.TWILIO_PHONE_NUMBER,
+            from_=twilio_phone,
             to=phone_number
         )
+        
+        logger.info(f"SMS sent successfully. Message SID: {message.sid}")
         return True, "SMS sent successfully"
     except Exception as e:
         logger.error(f"Error sending SMS: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error details: {e.__dict__}")
         return False, f"Error sending SMS: {str(e)}"

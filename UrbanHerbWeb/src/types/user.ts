@@ -11,35 +11,36 @@ export interface Address {
 }
 
 export interface UserPreferences {
-  sms_notifications: boolean;
+  language: 'en' | 'es' | 'fr';
+  currency: 'USD' | 'EUR' | 'GBP';
+  theme: 'light' | 'dark' | 'system';
   email_notifications: boolean;
-  promotions_notifications: boolean;
-  order_updates_notifications: boolean;
-  language: 'en' | 'sw';
-  currency: 'UGX' | 'USD';
+  push_notifications: boolean;
+  order_updates: boolean;
+  promotional_emails: boolean;
+  newsletter: boolean;
 }
 
 export interface User {
   id: string;
-  email?: string;
-  phone_number?: string;
+  email: string;
   first_name: string;
   last_name: string;
-  is_phone_verified: boolean;
+  bio?: string;
+  date_of_birth?: string;
+  gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
   is_email_verified: boolean;
-  addresses: Address[];
   preferences: UserPreferences;
   created_at: string;
   updated_at: string;
 }
 
 export interface RegisterData {
-  email?: string;
-  phone_number?: string;
-  password: string;
-  confirm_password: string;
+  email: string;
   first_name: string;
   last_name: string;
+  password: string;
+  confirm_password: string;
 }
 
 export interface EmailLoginData {

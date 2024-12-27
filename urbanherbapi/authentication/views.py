@@ -28,12 +28,16 @@ logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
-class PhoneVerificationView(APIView):
+class PhoneVerificationViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
 
-    def post(self, request):
+    @action(detail=False, methods=['post'])
+    def send_code(self, request):
         """Send phone verification code"""
         logger.info(f"Received phone verification request: {request.data}")
+        logger.info(f"Request headers: {request.headers}")
+        logger.info(f"Request method: {request.method}")
+        logger.info(f"Request path: {request.path}")
         
         phone_number = request.data.get('phone_number')
         force_send = request.data.get('force_send', False)
@@ -144,10 +148,8 @@ class PhoneVerificationView(APIView):
                 'details': message
             }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-class VerifyPhoneView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
+    @action(detail=False, methods=['post'])
+    def verify(self, request):
         """Verify phone number with OTP"""
         phone_number = request.data.get('phone_number')
         code = request.data.get('code')
