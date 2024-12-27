@@ -34,8 +34,8 @@ def api_root(request, format=None):
         'auth': {
             'login': reverse('token_obtain_pair', request=request, format=format),
             'refresh': reverse('token_refresh', request=request, format=format),
-            'register': request.build_absolute_uri('/api/auth/register/'),
-            'profile': request.build_absolute_uri('/api/auth/profile/'),
+            'register': request.build_absolute_uri('/api/v1/auth/register/'),
+            'profile': request.build_absolute_uri('/api/v1/auth/profile/'),
         },
         'products': {
             'list': reverse('product-list', request=request, format=format),
@@ -54,11 +54,11 @@ def api_root(request, format=None):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', api_root, name='api-root'),
-    path('api/auth/', include('authentication.urls')),
-    path('api/products/', include('products.urls')),
-    path('api/health-check/', lambda request: JsonResponse({'status': 'ok'})),
+    path('api/v1/', include('authentication.urls')),  
+    path('api/v1/products/', include('products.urls')),
+    path('api/health-check/', api_view(['GET'])(lambda request: Response({'status': 'ok'})), name='health-check'),
     # Swagger URLs
-    path('api/swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('api/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('api/swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('api/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

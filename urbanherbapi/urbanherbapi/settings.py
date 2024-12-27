@@ -34,6 +34,12 @@ TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
 TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER')
 
+# Debug print
+print("Loaded Twilio Settings:")
+print(f"Account SID: {TWILIO_ACCOUNT_SID}")
+print(f"Auth Token: {TWILIO_AUTH_TOKEN}")
+print(f"Phone Number: {TWILIO_PHONE_NUMBER}")
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -249,3 +255,9 @@ REST_FRAMEWORK = {
 
 # Custom user model
 AUTH_USER_MODEL = 'authentication.User'
+
+# Authentication Backends
+AUTHENTICATION_BACKENDS = [
+    'authentication.backends.EmailOrPhoneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]

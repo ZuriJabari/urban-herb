@@ -217,6 +217,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authApi.verifyPhone(data);
       console.log('Verify phone response:', response.data);  // Debug log
       
+      if (!response.data.access || !response.data.refresh) {
+        throw new Error('Invalid response format from server');
+      }
+      
       // Save tokens to localStorage
       localStorage.setItem('access_token', response.data.access);
       localStorage.setItem('refresh_token', response.data.refresh);
@@ -231,24 +235,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
       
-      // Then fetch the full user profile
-      try {
-        const userResponse = await userApi.getProfile();
-        console.log('User profile after verification:', userResponse.data);  // Debug log
-        dispatch({
-          type: 'UPDATE_USER',
-          payload: userResponse.data,
-        });
-      } catch (error) {
-        console.error('Failed to fetch user profile:', error);
-      }
-
+      // Navigate to home page
       navigate('/');
+      
     } catch (error: any) {
-      console.error('Phone verification failed:', error.response?.data);  // Debug log
+      console.error('Phone verification failed:', error);  // Debug log
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.detail || 
+                          error.message ||
+                          'Verification failed';
       dispatch({
         type: 'AUTH_FAILURE',
-        payload: error.response?.data?.detail || 'Verification failed',
+        payload: errorMessage,
       });
       throw error;
     }
