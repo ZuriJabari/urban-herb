@@ -35,9 +35,20 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Environment variables
+# Python virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# Environment files
 .env
 .env.local
+.env.development
+.env.test
+.env.production
+
+# Environment variables
 .env.development.local
 .env.test.local
 .env.production.local
