@@ -112,6 +112,7 @@ The API follows RESTful principles with the following base URLs:
 - Main branch contains stable production code
 - All new features should be developed in feature branches
 - Pull requests required for merging into develop and main
+- CI/CD pipeline configured with GitHub Actions
 
 ## Resources
 - GitHub Repository: https://github.com/ZuriJabari/urban-herb.git
