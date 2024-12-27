@@ -35,24 +35,55 @@ npm install
 npm run dev
 ```
 
-## Branch Protection
+## Development Workflow
 
-This repository enforces branch protection rules:
+### Branch Strategy
+- `main`: Production-ready code
+- `develop`: Development integration branch
+- Feature branches: Created for new features/fixes
 
-- All changes must go through pull requests
-- Pull requests require one approval
-- Status checks (build and lint) must pass
-- Branch must be up to date before merging
+### Development Process
+1. Create a feature branch from `develop`:
+   ```bash
+   git checkout develop
+   git pull origin develop
+   git checkout -b feature/your-feature-name
+   ```
+
+2. Make your changes and commit:
+   ```bash
+   git add .
+   git commit -m "Description of your changes"
+   ```
+
+3. Push your feature branch:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+4. Create a Pull Request to `develop`
+   - Ensure CI checks pass (build and lint)
+   - Merge when ready
+
+5. For releases:
+   - Create a PR from `develop` to `main`
+   - Ensure CI checks pass
+   - Merge to deploy to production
+
+### Quality Checks
+All branches require:
+- Successful build
+- Passing lint checks
+- Up-to-date with target branch
 
 ## Contributing
 
 1. Create a feature branch from `develop`
 2. Make your changes
-3. Create a pull request to `develop`
-4. Ensure all checks pass
-5. Get code review approval
-6. Merge your changes
+3. Ensure all CI checks pass
+4. Create a pull request
+5. Merge after CI passes
 
 ## License
 
-All rights reserved. © 2024 UrbanHerb
+All rights reserved. 2024 UrbanHerb
