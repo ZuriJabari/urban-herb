@@ -8,7 +8,7 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     
     steps:
@@ -32,25 +32,50 @@ jobs:
     - name: Install Node.js dependencies
       working-directory: ./UrbanHerbWeb
       run: npm install
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
     
     - name: Run backend tests
       working-directory: ./urbanherbapi
-      run: python manage.py test
+      run: |
+        pip install -r requirements.txt
+        python manage.py test
     
     - name: Run frontend tests
       working-directory: ./UrbanHerbWeb
-      run: npm test
+      run: |
+        npm install
+        npm test
+
+  lint:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
     
     - name: Run linting
       run: |
         pip install flake8
         flake8 ./urbanherbapi
-        cd UrbanHerbWeb && npm run lint
-
-  status-check:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Status Check
-        run: |
-          echo "All checks passed successfully!"
+        cd UrbanHerbWeb && npm install && npm run lint
