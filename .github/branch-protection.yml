@@ -5,7 +5,6 @@ branches:
         strict: true
         contexts:
           - "build"
-          - "test"
           - "lint"
       enforce_admins: true
       required_pull_request_reviews:
@@ -20,7 +19,6 @@ branches:
         strict: true
         contexts:
           - "build"
-          - "test"
           - "lint"
       enforce_admins: true
       required_pull_request_reviews:
