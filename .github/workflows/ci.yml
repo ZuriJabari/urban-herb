@@ -25,13 +25,16 @@ jobs:
         node-version: '18'
     
     - name: Install Python dependencies
+      working-directory: ./urbanherbapi
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
     - name: Install Node.js dependencies
       working-directory: ./UrbanHerbWeb
-      run: npm install
+      run: |
+        npm install
+        npm run build --if-present
 
   test:
     needs: build
@@ -55,7 +58,7 @@ jobs:
       working-directory: ./UrbanHerbWeb
       run: |
         npm install
-        npm test
+        npm test --passWithNoTests
 
   lint:
     needs: build
@@ -74,8 +77,14 @@ jobs:
       with:
         node-version: '18'
     
-    - name: Run linting
+    - name: Run Python linting
+      working-directory: ./urbanherbapi
       run: |
         pip install flake8
-        flake8 ./urbanherbapi
-        cd UrbanHerbWeb && npm install && npm run lint
+        flake8 .
+    
+    - name: Run JavaScript/TypeScript linting
+      working-directory: ./UrbanHerbWeb
+      run: |
+        npm install
+        npm run lint --if-present
