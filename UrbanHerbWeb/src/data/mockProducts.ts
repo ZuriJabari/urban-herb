@@ -1,0 +1,102 @@
+import { Product, Brand } from '../types/product';
+
+const mockBrand: Brand = {
+  id: '1',
+  name: 'UrbanCalm',
+  description: 'Premium CBD products for modern wellness',
+  website: 'https://urbancalm.com',
+  created_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-01-01T00:00:00Z'
+};
+
+export const mockProducts: Product[] = [
+  {
+    id: '1',
+    name: 'Calm CBD Gummies',
+    description: 'Delicious mixed berry flavored gummies infused with premium CBD for relaxation and stress relief.',
+    price: 29.99,
+    image: 'https://images.unsplash.com/photo-1611070960566-b8723e1e0c29?w=400',
+    category: 'EDIBLES',
+    cbd_content: '25mg/gummy',
+    effects: ['RELAXING', 'FOCUSED'],
+    benefits: ['Stress Relief', 'Better Sleep', 'Relaxation'],
+    stock: 50,
+    rating: 4.8,
+    review_count: 128,
+    brand: mockBrand,
+    lab_tested: true,
+    dosage: '1-2 gummies daily',
+    created_at: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '2',
+    name: 'Relief CBD Oil Tincture',
+    description: 'Full-spectrum CBD oil tincture for natural pain relief and inflammation reduction.',
+    price: 49.99,
+    image: 'https://images.unsplash.com/photo-1611070960566-b8723e1e0c29?w=400',
+    category: 'TINCTURES',
+    cbd_content: '1000mg/30ml',
+    effects: ['RELAXING', 'FOCUSED'],
+    benefits: ['Pain Relief', 'Reduced Inflammation', 'Anxiety Relief'],
+    stock: 40,
+    rating: 4.9,
+    review_count: 256,
+    brand: mockBrand,
+    lab_tested: true,
+    dosage: '1ml (33mg CBD) daily',
+    created_at: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '3',
+    name: 'Soothe CBD Topical Cream',
+    description: 'Fast-acting CBD cream for targeted relief of muscle and joint pain.',
+    price: 39.99,
+    image: 'https://images.unsplash.com/photo-1611070960566-b8723e1e0c29?w=400',
+    category: 'TOPICALS',
+    cbd_content: '500mg/2oz',
+    effects: ['RELAXING', 'CALMING'],
+    benefits: ['Muscle Relief', 'Joint Pain Relief', 'Skin Health'],
+    stock: 45,
+    rating: 4.7,
+    review_count: 89,
+    brand: mockBrand,
+    lab_tested: true,
+    created_at: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '4',
+    name: 'Focus CBD Vape Pen',
+    description: 'Premium CBD vape pen with natural terpenes for enhanced focus and clarity.',
+    price: 34.99,
+    image: 'https://images.unsplash.com/photo-1611070960566-b8723e1e0c29?w=400',
+    category: 'VAPES',
+    cbd_content: '250mg',
+    effects: ['FOCUSED', 'CREATIVE', 'ENERGIZING'],
+    benefits: ['Mental Clarity', 'Focus', 'Stress Relief'],
+    stock: 35,
+    rating: 4.6,
+    review_count: 67,
+    brand: mockBrand,
+    lab_tested: true,
+    dosage: '2-3 puffs as needed',
+    created_at: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '5',
+    name: 'Sleep CBD + CBN Gummies',
+    description: 'Specially formulated gummies combining CBD and CBN for optimal sleep support.',
+    price: 34.99,
+    image: 'https://images.unsplash.com/photo-1611070960566-b8723e1e0c29?w=400',
+    category: 'EDIBLES',
+    cbd_content: '25mg CBD + 5mg CBN/gummy',
+    effects: ['SLEEPY', 'RELAXING'],
+    benefits: ['Better Sleep', 'Relaxation', 'Stress Relief'],
+    stock: 30,
+    rating: 4.9,
+    review_count: 154,
+    brand: mockBrand,
+    lab_tested: true,
+    dosage: '1 gummy 30 minutes before bed',
+    created_at: '2024-01-01T00:00:00Z'
+  }
+];
