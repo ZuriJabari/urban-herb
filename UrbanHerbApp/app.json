@@ -1,0 +1,69 @@
+{
+  "name": "UrbanHerbApp",
+  "displayName": "UrbanHerbApp",
+  "expo": {
+    "name": "UrbanHerbApp",
+    "slug": "urbanherb",
+    "scheme": "urbanherbapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/images/app-icon-all.png",
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/655ab1d8-20b5-472f-87bc-976505305749"
+    },
+    "newArchEnabled": false,
+    "jsEngine": "hermes",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "icon": "./assets/images/app-icon-ios.png",
+      "supportsTablet": true,
+      "bundleIdentifier": "com.urbanherbapp"
+    },
+    "android": {
+      "icon": "./assets/images/app-icon-android-legacy.png",
+      "package": "com.urbanherbapp",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
+        "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/images/app-icon-web-favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-localization",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/app-icon-android-adaptive-foreground.png",
+          "imageWidth": 300,
+          "resizeMode": "contain",
+          "backgroundColor": "#191015"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow UrbanHerb to use your location."
+        }
+      ]
+    ],
+    "experiments": {
+      "tsconfigPaths": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "655ab1d8-20b5-472f-87bc-976505305749"
+      }
+    }
+  },
+  "ignite": {
+    "version": "10.1.1"
+  }
+}
