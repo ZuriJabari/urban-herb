@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Verification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .verification-code {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .instructions {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Welcome to UrbanHerb!</h2>
+    
+    <p>Hi {{first_name}},</p>
+    
+    <p>Thanks for signing up with UrbanHerb. To complete your registration, please use the following verification code:</p>
+    
+    <div class="verification-code">
+        {{verification_code}}
+    </div>
+    
+    <div class="instructions">
+        <p>To verify your email:</p>
+        <ol>
+            <li>Go to the verification page</li>
+            <li>Enter your email address</li>
+            <li>Enter the 6-digit verification code shown above</li>
+            <li>Click "Verify Email"</li>
+        </ol>
+    </div>
+    
+    <p>This code will expire in 10 minutes.</p>
+    
+    <p>If you didn't create an account with UrbanHerb, you can safely ignore this email.</p>
+    
+    <p>Best regards,<br>The UrbanHerb Team</p>
+</body>
+</html>

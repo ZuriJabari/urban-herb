@@ -40,18 +40,74 @@ class ProductViewSet(viewsets.ModelViewSet):
     search_fields = ['name', 'description', 'brand__name']
     ordering_fields = ['price', 'rating', 'created_at']
     ordering = ['-created_at']
+    permission_classes = [AllowAny]  # Allow unauthenticated access to product endpoints
+
+    def get_queryset(self):
+        queryset = Product.objects.all().prefetch_related(
+            'images', 'reviews', 'brand'
+        ).select_related('brand')
+
+        # Filter by category
+        category = self.request.query_params.get('category', None)
+        if category:
+            queryset = queryset.filter(category=category)
+
+        # Filter by search query
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(description__icontains=search) |
+                Q(brand__name__icontains=search)
+            )
+
+        # Exclude specific product
+        exclude_id = self.request.query_params.get('exclude_id', None)
+        if exclude_id:
+            queryset = queryset.exclude(id=exclude_id)
+
+        # Limit results
+        limit = self.request.query_params.get('limit', None)
+        if limit:
+            try:
+                limit = int(limit)
+                queryset = queryset[:limit]
+            except ValueError:
+                pass
+
+        return queryset
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return ProductCreateUpdateSerializer
         return ProductSerializer
 
-    def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
-            return [AllowAny()]
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsAdminUser()]
-        return [AllowAny()]
+    @action(detail=True, methods=['post'])
+    def update_stock(self, request, pk=None):
+        product = self.get_object()
+        quantity = request.data.get('quantity', 0)
+
+        try:
+            quantity = int(quantity)
+            if quantity <= 0:
+                raise ValueError()
+        except ValueError:
+            return Response(
+                {'error': 'Quantity must be a positive integer'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if product.stock < quantity:
+            return Response(
+                {'error': 'Not enough stock available'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        product.stock -= quantity
+        product.save()
+
+        serializer = self.get_serializer(product)
+        return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
     def categories(self, request):
@@ -60,48 +116,6 @@ class ProductViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def effects(self, request):
         return Response([choice[0] for choice in Product._meta.get_field('effects').choices])
-
-    @action(detail=False, methods=['get'])
-    def search(self, request):
-        query = request.query_params.get('q', '')
-        category = request.query_params.get('category', '')
-        min_price = request.query_params.get('min_price')
-        max_price = request.query_params.get('max_price')
-        effects = request.query_params.getlist('effects')
-        strain = request.query_params.get('strain')
-
-        queryset = self.get_queryset()
-
-        if query:
-            queryset = queryset.filter(
-                Q(name__icontains=query) |
-                Q(description__icontains=query) |
-                Q(brand__name__icontains=query)
-            )
-
-        if category:
-            queryset = queryset.filter(category=category)
-
-        if min_price is not None:
-            queryset = queryset.filter(price__gte=min_price)
-
-        if max_price is not None:
-            queryset = queryset.filter(price__lte=max_price)
-
-        if effects:
-            for effect in effects:
-                queryset = queryset.filter(effects__contains=[effect])
-
-        if strain:
-            queryset = queryset.filter(strain=strain)
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
 
 class ProductImageViewSet(viewsets.ModelViewSet):
     queryset = ProductImage.objects.all()
@@ -156,6 +170,39 @@ class CartViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def add(self, request):
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        product_id = request.data.get('product_id')
+        quantity = request.data.get('quantity', 1)
+
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response(
+                {'error': 'Product not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if product.stock < quantity:
+            return Response(
+                {'error': 'Not enough stock available'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        cart_item, created = CartItem.objects.get_or_create(
+            cart=cart,
+            product=product,
+            defaults={'quantity': quantity}
+        )
+
+        if not created:
+            cart_item.quantity += quantity
+            cart_item.save()
+
+        serializer = self.get_serializer(cart)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def add_item(self, request, pk=None):
@@ -222,6 +269,55 @@ class WishlistViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def toggle(self, request):
+        product_id = request.data.get('product_id')
+        if not product_id:
+            return Response(
+                {'error': 'product_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response(
+                {'error': 'Product not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        wishlist, _ = Wishlist.objects.get_or_create(user=request.user)
+        
+        if product in wishlist.products.all():
+            wishlist.products.remove(product)
+            is_wishlisted = False
+        else:
+            wishlist.products.add(product)
+            is_wishlisted = True
+
+        return Response({'is_wishlisted': is_wishlisted})
+
+    @action(detail=False, methods=['get'])
+    def check(self, request, product_id=None):
+        if not product_id:
+            return Response(
+                {'error': 'product_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response(
+                {'error': 'Product not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        wishlist = Wishlist.objects.filter(user=request.user).first()
+        is_wishlisted = wishlist and product in wishlist.products.all()
+
+        return Response({'is_wishlisted': is_wishlisted})
 
     @action(detail=True, methods=['post'])
     def add_product(self, request, pk=None):

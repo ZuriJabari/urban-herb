@@ -1,24 +1,16 @@
 import { ChakraProvider, extendTheme } from '@chakra-ui/react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { Layout } from './components/Layout';
-import HomePage from './pages/HomePage';
-import CartPage from './pages/CartPage';
-import WishlistPage from './pages/WishlistPage';
-import ProductDetailsPage from './pages/ProductDetailsPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import VerifyPhonePage from './pages/VerifyPhonePage';
-import PasswordRecoveryPage from './pages/PasswordRecoveryPage';
-import ProfilePage from './pages/ProfilePage';
-import { SearchProvider } from './contexts/SearchContext';
-import { WishlistProvider } from './contexts/WishlistContext';
-import { CartProvider } from './contexts/CartContext';
-import { AuthProvider } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import { Suspense } from 'react';
 import LoadingSpinner from './components/LoadingSpinner';
-import PrivateRoute from './components/PrivateRoute';
+import Navbar from './components/Navbar';
+import Footer from './components/Footer';
+import { AuthProvider } from './contexts/AuthContext';
+import { CartProvider } from './contexts/CartContext';
+import { WishlistProvider } from './contexts/WishlistContext';
+import { SearchProvider } from './contexts/SearchContext';
 
 const theme = extendTheme({
   styles: {
@@ -52,52 +44,23 @@ const App = () => {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ChakraProvider theme={theme}>
-          <Router>
-            <AuthProvider>
-              <CartProvider>
-                <WishlistProvider>
-                  <SearchProvider>
-                    <Layout>
+          <AuthProvider>
+            <CartProvider>
+              <WishlistProvider>
+                <SearchProvider>
+                  <div className="min-h-screen flex flex-col">
+                    <Navbar />
+                    <main className="flex-grow">
                       <Suspense fallback={<LoadingSpinner text="Loading..." />}>
-                        <Routes>
-                          <Route path="/" element={<HomePage />} />
-                          <Route path="/login" element={<LoginPage />} />
-                          <Route path="/register" element={<RegisterPage />} />
-                          <Route path="/verify-phone" element={<VerifyPhonePage />} />
-                          <Route path="/password-recovery" element={<PasswordRecoveryPage />} />
-                          <Route
-                            path="/cart"
-                            element={
-                              <PrivateRoute>
-                                <CartPage />
-                              </PrivateRoute>
-                            }
-                          />
-                          <Route
-                            path="/wishlist"
-                            element={
-                              <PrivateRoute>
-                                <WishlistPage />
-                              </PrivateRoute>
-                            }
-                          />
-                          <Route
-                            path="/profile"
-                            element={
-                              <PrivateRoute>
-                                <ProfilePage />
-                              </PrivateRoute>
-                            }
-                          />
-                          <Route path="/product/:id" element={<ProductDetailsPage />} />
-                        </Routes>
+                        <Outlet />
                       </Suspense>
-                    </Layout>
-                  </SearchProvider>
-                </WishlistProvider>
-              </CartProvider>
-            </AuthProvider>
-          </Router>
+                    </main>
+                    <Footer />
+                  </div>
+                </SearchProvider>
+              </WishlistProvider>
+            </CartProvider>
+          </AuthProvider>
         </ChakraProvider>
       </QueryClientProvider>
     </ErrorBoundary>

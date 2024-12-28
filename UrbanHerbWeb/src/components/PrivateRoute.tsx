@@ -30,6 +30,12 @@ const PrivateRoute = ({ children }: PrivateRouteProps) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Check if email is verified
+  if (!user.is_email_verified) {
+    // Redirect to email verification page
+    return <Navigate to="/verify-email" state={{ from: location }} replace />;
+  }
+
   return <>{children}</>;
 };
 

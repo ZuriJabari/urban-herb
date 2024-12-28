@@ -33,7 +33,13 @@ export const ProductCard = ({ product }: ProductCardProps) => {
   const priceColor = useColorModeValue('green.600', 'green.300');
 
   const handleAddToCart = () => {
-    addToCart(product);
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: parseFloat(product.price),
+      image: product.images?.[0]?.image || '',
+      quantity: 1
+    });
     toast({
       title: 'Added to cart',
       description: `${product.name} has been added to your cart`,
@@ -79,7 +85,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
       overflow="hidden"
       transition="all 0.2s"
       _hover={{ shadow: 'lg' }}
-      onClick={() => navigate(`/product/${product.id}`)}
+      onClick={() => navigate(`/products/${product.id}`)}
       cursor="pointer"
     >
       <Box position="relative" height="200px" overflow="hidden">
@@ -99,7 +105,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           )}
         </AnimatePresence>
         <Image
-          src={product.image}
+          src={product.images?.[0]?.image || '/placeholder.jpg'}
           alt={product.name}
           objectFit="cover"
           width="100%"

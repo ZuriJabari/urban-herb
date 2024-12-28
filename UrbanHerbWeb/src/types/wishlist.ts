@@ -1,15 +1,15 @@
 import { Product } from './product';
 
 export interface WishlistItem {
-  productId: string;
+  productId: number;
   addedAt: string;
 }
 
 export interface WishlistContextType {
   items: WishlistItem[];
-  addItem: (productId: string) => Promise<void>;
-  removeItem: (productId: string) => Promise<void>;
-  moveToCart: (productId: string) => Promise<void>;
+  addItem: (productId: number) => Promise<void>;
+  removeItem: (productId: number) => Promise<void>;
+  moveToCart: (productId: number) => Promise<void>;
   clearWishlist: () => Promise<void>;
   loading: boolean;
 }

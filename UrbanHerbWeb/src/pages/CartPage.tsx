@@ -239,22 +239,22 @@ const CartPage = () => {
                   <Stack spacing={4}>
                     <HStack justify="space-between">
                       <Text>Subtotal</Text>
-                      <Text>${subtotal.toFixed(2)}</Text>
+                      <Text>${subtotal}</Text>
                     </HStack>
                     <HStack justify="space-between">
                       <Text>Shipping</Text>
                       <Text>
-                        {shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}
+                        {shipping === 0 ? 'Free' : `$${shipping}`}
                       </Text>
                     </HStack>
                     <HStack justify="space-between">
                       <Text>Tax</Text>
-                      <Text>${tax.toFixed(2)}</Text>
+                      <Text>${tax}</Text>
                     </HStack>
                     <Divider />
                     <HStack justify="space-between" fontWeight="bold">
                       <Text>Total</Text>
-                      <Text>${total.toFixed(2)}</Text>
+                      <Text>${total}</Text>
                     </HStack>
                     <Button
                       colorScheme="green"

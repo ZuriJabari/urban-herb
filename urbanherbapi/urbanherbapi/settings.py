@@ -29,11 +29,6 @@ DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
-# Twilio Settings
-TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
-TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
-TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER')
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -43,13 +38,19 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
     
     # Third party apps
     'rest_framework',
+    'rest_framework.authtoken',  
     'rest_framework_simplejwt',
     'corsheaders',
     'drf_yasg',
-    'django_filters',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',  # Required by dj-rest-auth
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
     
     # Local apps
     'authentication',
@@ -57,7 +58,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # CORS middleware first
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -65,6 +66,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'urbanherbapi.urls'
@@ -72,7 +74,9 @@ ROOT_URLCONF = 'urbanherbapi.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR / 'templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -102,34 +106,40 @@ DATABASES = {
     }
 }
 
-# Email Configuration
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+# URLs for email templates
+PRIVACY_POLICY_URL = os.getenv('PRIVACY_POLICY_URL', 'https://urbanherb.com/privacy')
+TERMS_URL = os.getenv('TERMS_URL', 'https://urbanherb.com/terms')
 
-# JWT Settings
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.getenv('JWT_ACCESS_TOKEN_LIFETIME', 5))),
-    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=int(os.getenv('JWT_REFRESH_TOKEN_LIFETIME', 1440))),
-    'SIGNING_KEY': os.getenv('JWT_SECRET_KEY', SECRET_KEY),
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-}
+# Email Backend Configuration - Using Console Backend for Development
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Site framework settings
+SITE_ID = 1
+
+# Authentication settings
+AUTH_USER_MODEL = 'authentication.User'
+
+AUTHENTICATION_BACKENDS = [
+    'authentication.backends.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+LOGIN_URL = 'admin:login'
+LOGIN_REDIRECT_URL = 'admin:index'
+LOGOUT_REDIRECT_URL = 'admin:login'
+
+# Session settings
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
+SESSION_COOKIE_NAME = 'urbanherbsession'
+SESSION_COOKIE_SECURE = False  # Set to True in production
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', 
-    ','.join([
-        f'http://localhost:{port}' for port in range(8000, 8011)
-    ] + [
-        f'http://127.0.0.1:{port}' for port in range(8000, 8011)
-    ] + ['http://localhost:5173', 'http://127.0.0.1:5173']
-)).split(',')
+CORS_ORIGIN_ALLOW_ALL = True  # Only for development
 CORS_ALLOW_CREDENTIALS = True
+
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -138,6 +148,26 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# CSRF settings
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_SECURE = False  # Set to True in production
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = None  # Required for cross-origin requests
+CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
 
 # Swagger/OpenAPI settings
 SWAGGER_SETTINGS = {
@@ -183,6 +213,24 @@ if os.getenv('AWS_ACCESS_KEY_ID'):
     AWS_DEFAULT_ACL = 'public-read'
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
 
+# Firebase settings
+FIREBASE_PRIVATE_KEY = os.getenv('FIREBASE_PRIVATE_KEY', '')
+if FIREBASE_PRIVATE_KEY.startswith('"') and FIREBASE_PRIVATE_KEY.endswith('"'):
+    FIREBASE_PRIVATE_KEY = FIREBASE_PRIVATE_KEY[1:-1]  # Remove surrounding quotes
+
+FIREBASE_CREDENTIALS = {
+    "type": "service_account",
+    "project_id": os.getenv('FIREBASE_PROJECT_ID', ''),
+    "private_key_id": os.getenv('FIREBASE_PRIVATE_KEY_ID', ''),
+    "private_key": FIREBASE_PRIVATE_KEY.replace('\\n', '\n'),
+    "client_email": os.getenv('FIREBASE_CLIENT_EMAIL', ''),
+    "client_id": os.getenv('FIREBASE_CLIENT_ID', ''),
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": os.getenv('FIREBASE_CLIENT_CERT_URL', '')
+}
+
 # Logging Configuration
 LOGGING = {
     'version': 1,
@@ -198,54 +246,91 @@ LOGGING = {
         },
     },
     'handlers': {
-        'file': {
-            'level': os.getenv('LOG_LEVEL', 'INFO'),
-            'class': 'logging.FileHandler',
-            'filename': os.getenv('LOG_FILE', 'debug.log'),
+        'console': {
+            'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'console': {
-            'level': os.getenv('LOG_LEVEL', 'INFO'),
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'formatter': 'verbose',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['file', 'console'],
-            'level': os.getenv('LOG_LEVEL', 'INFO'),
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
             'propagate': True,
         },
         'authentication': {
-            'handlers': ['file', 'console'],
-            'level': os.getenv('LOG_LEVEL', 'INFO'),
-            'propagate': True,
-        },
-        'products': {
-            'handlers': ['file', 'console'],
-            'level': os.getenv('LOG_LEVEL', 'INFO'),
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
             'propagate': True,
         },
     },
 }
+
+# Create logs directory if it doesn't exist
+LOGS_DIR = os.path.join(BASE_DIR, 'logs')
+if not os.path.exists(LOGS_DIR):
+    os.makedirs(LOGS_DIR)
 
 # Feature Flags
 ENABLE_USER_REGISTRATION = os.getenv('ENABLE_USER_REGISTRATION', 'True').lower() == 'true'
 ENABLE_SOCIAL_AUTH = os.getenv('ENABLE_SOCIAL_AUTH', 'False').lower() == 'true'
 ENABLE_PHONE_VERIFICATION = os.getenv('ENABLE_PHONE_VERIFICATION', 'False').lower() == 'true'
 
+# Password hashers
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+]
+
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 8,
+        }
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Rest Framework settings
+# dj-rest-auth settings
+REST_USE_JWT = True
+JWT_AUTH_COOKIE = 'urban-herb-auth'
+JWT_AUTH_REFRESH_COOKIE = 'urban-herb-refresh'
+
+# Rest framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
 }
 
-# Custom user model
-AUTH_USER_MODEL = 'authentication.User'
+# JWT settings
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}

@@ -54,7 +54,7 @@ const NAV_ITEMS: Array<NavItem> = [
       {
         label: 'All Products',
         subLabel: 'Browse our complete catalog',
-        href: '/shop',
+        href: '/products',
       },
       {
         label: 'Categories',
@@ -199,118 +199,126 @@ export const Navigation = () => {
                     size="sm"
                     _focus={{
                       borderColor: 'green.400',
-                      boxShadow: '0 0 0 1px var(--chakra-colors-green-400)',
+                      boxShadow: '0 0 0 1px green.400',
                     }}
                   />
                 </InputGroup>
               </form>
             </Box>
 
-            <HStack spacing={3}>
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                <IconButton
-                  as={RouterLink}
-                  to="/wishlist"
-                  aria-label="Wishlist"
-                  icon={
-                    <>
-                      <Icon as={FaHeart} />
-                      <AnimatePresence>
+            {user ? (
+              <>
+                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+                  <IconButton
+                    as={RouterLink}
+                    to="/wishlist"
+                    variant="ghost"
+                    aria-label="Wishlist"
+                    icon={
+                      <>
+                        <Icon as={FaHeart} />
                         {wishlistItems.length > 0 && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0 }}
+                          <Badge
+                            colorScheme="red"
+                            position="absolute"
+                            top="-1"
+                            right="-1"
+                            fontSize="xs"
+                            borderRadius="full"
                           >
-                            <Badge
-                              colorScheme="red"
-                              position="absolute"
-                              top="-1"
-                              right="-1"
-                              fontSize="xs"
-                              borderRadius="full"
-                            >
-                              {wishlistItems.length}
-                            </Badge>
-                          </motion.div>
+                            {wishlistItems.length}
+                          </Badge>
                         )}
-                      </AnimatePresence>
-                    </>
-                  }
-                  variant="ghost"
-                />
-              </motion.div>
+                      </>
+                    }
+                  />
+                </motion.div>
 
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                <IconButton
-                  as={RouterLink}
-                  to="/cart"
-                  aria-label="Shopping Cart"
-                  icon={
-                    <>
-                      <Icon as={FaShoppingCart} />
-                      <AnimatePresence>
+                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+                  <IconButton
+                    as={RouterLink}
+                    to="/cart"
+                    variant="ghost"
+                    aria-label="Shopping Cart"
+                    icon={
+                      <>
+                        <Icon as={FaShoppingCart} />
                         {cartItems.length > 0 && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0 }}
+                          <Badge
+                            colorScheme="green"
+                            position="absolute"
+                            top="-1"
+                            right="-1"
+                            fontSize="xs"
+                            borderRadius="full"
                           >
-                            <Badge
-                              colorScheme="green"
-                              position="absolute"
-                              top="-1"
-                              right="-1"
-                              fontSize="xs"
-                              borderRadius="full"
-                            >
-                              {cartItems.length}
-                            </Badge>
-                          </motion.div>
+                            {cartItems.length}
+                          </Badge>
                         )}
-                      </AnimatePresence>
-                    </>
-                  }
-                  variant="ghost"
-                />
-              </motion.div>
+                      </>
+                    }
+                  />
+                </motion.div>
 
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                 <Menu>
                   <MenuButton
-                    as={IconButton}
-                    icon={<Icon as={FaUser} />}
-                    variant="ghost"
-                    aria-label="User menu"
-                  />
-                  <MenuList
-                    as={motion.div}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
+                    as={Button}
+                    rounded={'full'}
+                    variant={'link'}
+                    cursor={'pointer'}
+                    minW={0}
                   >
-                    {user ? (
-                      <>
-                        <MenuItem as={RouterLink} to="/profile">Profile</MenuItem>
-                        <MenuItem as={RouterLink} to="/orders">Orders</MenuItem>
-                        <MenuItem as={RouterLink} to="/settings">Settings</MenuItem>
-                        <MenuDivider />
-                        <MenuItem onClick={() => {
-                          logout();
-                          navigate('/login');
-                        }}>Sign Out</MenuItem>
-                      </>
-                    ) : (
-                      <>
-                        <MenuItem as={RouterLink} to="/login">Sign In</MenuItem>
-                        <MenuItem as={RouterLink} to="/register">Register</MenuItem>
-                      </>
-                    )}
+                    <Avatar
+                      size={'sm'}
+                      name={`${user.first_name} ${user.last_name}`}
+                    />
+                  </MenuButton>
+                  <MenuList>
+                    <MenuItem as={RouterLink} to="/profile">
+                      Profile
+                    </MenuItem>
+                    <MenuItem as={RouterLink} to="/orders">
+                      Orders
+                    </MenuItem>
+                    <MenuDivider />
+                    <MenuItem onClick={logout}>
+                      Sign Out
+                    </MenuItem>
                   </MenuList>
                 </Menu>
-              </motion.div>
-            </HStack>
+              </>
+            ) : (
+              <>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button
+                    as={RouterLink}
+                    to="/login"
+                    fontSize={'sm'}
+                    fontWeight={400}
+                    variant={'link'}
+                  >
+                    Sign In
+                  </Button>
+                </motion.div>
+
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button
+                    as={RouterLink}
+                    to="/register"
+                    display={{ base: 'none', md: 'inline-flex' }}
+                    fontSize={'sm'}
+                    fontWeight={600}
+                    color={'white'}
+                    bg={'green.400'}
+                    _hover={{
+                      bg: 'green.500',
+                    }}
+                  >
+                    Sign Up
+                  </Button>
+                </motion.div>
+              </>
+            )}
           </Stack>
         </Flex>
       </motion.div>
