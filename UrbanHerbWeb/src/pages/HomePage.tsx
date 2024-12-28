@@ -15,72 +15,70 @@ import {
   IconButton,
   useDisclosure,
   Badge,
-  useColorModeValue
+  useColorModeValue,
+  useToast
 } from '@chakra-ui/react';
-import { FaSearch, FaLeaf, FaShoppingCart, FaBook, FaFilter } from 'react-icons/fa';
-import { useState, useEffect, useMemo } from 'react';
+import { FaSearch, FaLeaf, FaShoppingCart, FaBook } from 'react-icons/fa';
+import { useState, useEffect } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { ProductCard } from '../components/ProductCard';
-import { mockProducts } from '../data/mockProducts';
-import { ProductCategory } from '../types/product';
+import { Product, ProductCategory } from '../types/product';
 import { Cart } from '../components/Cart';
 import { useCart } from '../contexts/CartContext';
-import { useQuery } from 'react-query';
-import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { motion } from 'framer-motion';
 import { useLoading } from '../hooks/useLoading';
 import { useErrorHandler } from '../hooks/useErrorHandler';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { ProductService } from '../services/product.service';
 
 const categories: ProductCategory[] = [
-  'Flowers',
-  'Edibles',
-  'Concentrates',
-  'Vapes',
-  'Pre-rolls',
-  'Tinctures',
-  'Topicals'
+  'FLOWERS',
+  'EDIBLES',
+  'CONCENTRATES',
+  'VAPES',
+  'PRE_ROLLS',
+  'TINCTURES',
+  'TOPICALS',
+  'ACCESSORIES',
+  'SEEDS'
 ];
 
 const HomePage = () => {
-  const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<ProductCategory | ''>('');
   const [searchQuery, setSearchQuery] = useState('');
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { items: cartItems, loading: cartLoading } = useCart();
-  const { isLoading, withLoading } = useLoading(true); // Start with loading state
+  const { isLoading, withLoading } = useLoading(true);
   const { handleError } = useErrorHandler();
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const toast = useToast();
 
-  // Simulate fetching products
+  // Fetch products from API
   const fetchProducts = async () => {
     try {
-      await withLoading(
-        new Promise((resolve) => {
-          setTimeout(() => {
-            setProducts(mockProducts);
-            resolve(null);
-          }, 1500);
-        })
-      );
-    } catch (error) {
-      handleError(error);
+      console.log('Fetching products with:', { selectedCategory, searchQuery });
+      const fetchedProducts = await ProductService.getProducts(selectedCategory, searchQuery);
+      console.log('Fetched products:', fetchedProducts);
+      setProducts(fetchedProducts);
+    } catch (error: any) {
+      console.error('Error fetching products:', error);
+      const errorMessage = error.message || 'Failed to fetch products';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      setProducts([]);
     }
   };
 
-  // Fetch products on mount
+  // Fetch products when category or search changes
   useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
-      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
-    });
-  }, [products, selectedCategory, searchQuery]);
+    withLoading(fetchProducts());
+  }, [selectedCategory, searchQuery]);
 
   if (isLoading || cartLoading) {
     return (
@@ -158,8 +156,8 @@ const HomePage = () => {
 
           <HStack spacing={4} overflowX="auto" pb={2} width="100%">
             <Button
-              colorScheme={selectedCategory === 'all' ? 'green' : 'gray'}
-              onClick={() => setSelectedCategory('all')}
+              colorScheme={selectedCategory === '' ? 'green' : 'gray'}
+              onClick={() => setSelectedCategory('')}
             >
               All
             </Button>
@@ -170,7 +168,7 @@ const HomePage = () => {
                 onClick={() => setSelectedCategory(category)}
                 whiteSpace="nowrap"
               >
-                {category}
+                {category.replace('_', ' ')}
               </Button>
             ))}
           </HStack>
@@ -186,27 +184,23 @@ const HomePage = () => {
           }}
           gap={6}
         >
-          {filteredProducts.length === 0 ? (
+          {products.length === 0 ? (
             <VStack py={8} spacing={4}>
               <Text>No products found.</Text>
               <Button onClick={() => {
-                setSelectedCategory('all');
+                setSelectedCategory('');
                 setSearchQuery('');
               }}>
                 Clear Filters
               </Button>
             </VStack>
           ) : (
-            filteredProducts.map((product) => (
+            products.map((product) => (
               <motion.div
                 key={product.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 260,
-                  damping: 20
-                }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
               >
                 <ProductCard product={product} />
               </motion.div>
@@ -215,6 +209,7 @@ const HomePage = () => {
         </Grid>
       </Container>
 
+      {/* Shopping Cart Drawer */}
       <Cart isOpen={isOpen} onClose={onClose} />
     </Box>
   );

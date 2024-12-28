@@ -64,7 +64,7 @@ export const Cart = ({ isOpen, onClose }: CartProps) => {
                     />
                     <VStack align="start" flex={1}>
                       <Text fontWeight="bold">{item.product.name}</Text>
-                      <Text color="green.600">${item.product.price.toFixed(2)}</Text>
+                      <Text color="green.600">${item.product.price}</Text>
                       <HStack>
                         <IconButton
                           aria-label="Decrease quantity"
@@ -102,7 +102,7 @@ export const Cart = ({ isOpen, onClose }: CartProps) => {
               <HStack justify="space-between" width="100%">
                 <Text fontSize="lg" fontWeight="bold">Total:</Text>
                 <Text fontSize="lg" fontWeight="bold" color="green.600">
-                  ${total.toFixed(2)}
+                  ${total}
                 </Text>
               </HStack>
               <Button colorScheme="green" width="100%" onClick={handleCheckout}>

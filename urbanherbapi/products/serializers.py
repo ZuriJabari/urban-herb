@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Product, Brand, ProductImage, Review, Cart, CartItem, Wishlist
+from django.db.models import Avg
 import json
 
 class BrandSerializer(serializers.ModelSerializer):
@@ -31,10 +32,23 @@ class ProductSerializer(serializers.ModelSerializer):
     reviews = ReviewSerializer(many=True, read_only=True)
     effects = serializers.ListField(child=serializers.CharField(), required=False)
     benefits = serializers.ListField(child=serializers.CharField(), required=False)
+    average_rating = serializers.FloatField(read_only=True)
+    total_reviews = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Product
-        fields = '__all__'
+        fields = [
+            'id', 'name', 'description', 'price', 'category', 'brand', 'strain',
+            'thc_content', 'cbd_content', 'effects', 'benefits', 'lab_tested', 'stock',
+            'images', 'reviews', 'average_rating', 'total_reviews', 'created_at',
+            'updated_at'
+        ]
+
+    def get_average_rating(self, obj):
+        return obj.reviews.aggregate(Avg('rating'))['rating__avg'] or 0.0
+
+    def get_total_reviews(self, obj):
+        return obj.reviews.count()
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -48,6 +62,9 @@ class ProductSerializer(serializers.ModelSerializer):
             ret['benefits'] = json.loads(instance.benefits) if instance.benefits else []
         except (TypeError, json.JSONDecodeError):
             ret['benefits'] = []
+
+        ret['average_rating'] = self.get_average_rating(instance)
+        ret['total_reviews'] = self.get_total_reviews(instance)
 
         return ret
 

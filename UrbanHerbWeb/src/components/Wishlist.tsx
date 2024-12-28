@@ -36,16 +36,53 @@ export const Wishlist = ({ isOpen, onClose }: WishlistProps) => {
     product: mockProducts.find(p => p.id === item.productId)!
   })).filter(item => item.product);
 
-  const handleAddToCart = (productId: string) => {
-    const product = mockProducts.find(p => p.id === productId);
-    if (product) {
-      addToCart(product);
+  const handleAddToCart = async (productId: number) => {
+    try {
+      const product = mockProducts.find(p => p.id === productId);
+      if (product) {
+        await addToCart(product);
+        toast({
+          title: 'Added to cart',
+          description: 'Item has been moved to your cart',
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+          position: 'bottom-right',
+        });
+      }
+    } catch (error) {
+      console.error('Error moving item to cart:', error);
       toast({
-        title: 'Added to cart',
-        description: `${product.name} has been added to your cart`,
+        title: 'Error',
+        description: 'Failed to move item to cart',
+        status: 'error',
+        duration: 2000,
+        isClosable: true,
+        position: 'bottom-right',
+      });
+    }
+  };
+
+  const handleRemoveFromWishlist = async (productId: number) => {
+    try {
+      await removeItem(productId);
+      toast({
+        title: 'Removed from wishlist',
+        description: 'Item has been removed from your wishlist',
         status: 'success',
         duration: 2000,
         isClosable: true,
+        position: 'bottom-right',
+      });
+    } catch (error) {
+      console.error('Error removing item from wishlist:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove item from wishlist',
+        status: 'error',
+        duration: 2000,
+        isClosable: true,
+        position: 'bottom-right',
       });
     }
   };
@@ -74,7 +111,7 @@ export const Wishlist = ({ isOpen, onClose }: WishlistProps) => {
                     />
                     <VStack align="start" flex={1}>
                       <Text fontWeight="bold">{product.name}</Text>
-                      <Text color="green.600">${product.price.toFixed(2)}</Text>
+                      <Text color="green.600">${product.price}</Text>
                       <Text fontSize="sm" color="gray.500">
                         Added on {new Date(addedAt).toLocaleDateString()}
                       </Text>
@@ -93,7 +130,7 @@ export const Wishlist = ({ isOpen, onClose }: WishlistProps) => {
                           size="sm"
                           colorScheme="red"
                           variant="ghost"
-                          onClick={() => removeItem(product.id)}
+                          onClick={() => handleRemoveFromWishlist(product.id)}
                         />
                       </HStack>
                     </VStack>

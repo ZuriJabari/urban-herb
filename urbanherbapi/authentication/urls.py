@@ -1,35 +1,20 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import (
-    RegistrationViewSet, LoginViewSet, UserViewSet, AddressViewSet, PreferencesViewSet,
-    PhoneVerificationView, VerifyPhoneView
-)
-
-# Create a router for viewsets
-router = DefaultRouter()
-router.register('users', UserViewSet, basename='users')
-router.register('addresses', AddressViewSet, basename='addresses')
-router.register('preferences', PreferencesViewSet, basename='preferences')
-
-# Auth routes
-auth_router = DefaultRouter()
-auth_router.register('register', RegistrationViewSet, basename='register')
-auth_router.register('login', LoginViewSet, basename='login')
+from .views.profile_views import get_user_profile
+from .views.test_views import test_auth_endpoint
+from .views import FirebaseTokenView
 
 urlpatterns = [
-    # ViewSet URLs
-    path('', include(router.urls)),
-    path('auth/', include(auth_router.urls)),
-    
     # JWT token endpoints
-    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    
-    # Phone verification endpoints
-    path('phone/send-verification/', PhoneVerificationView.as_view(), name='send-phone-verification'),
-    path('phone/verify/', VerifyPhoneView.as_view(), name='verify-phone'),
+    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     # User profile endpoint
-    path('profile/', UserViewSet.as_view({'get': 'me', 'patch': 'me'}), name='user-profile'),
+    path('auth/profile/', get_user_profile, name='user-profile'),
+    
+    # Firebase token exchange endpoint
+    path('auth/firebase-token/', FirebaseTokenView.as_view(), name='firebase-token'),
+    
+    # Test endpoint
+    path('auth/test/', test_auth_endpoint, name='test-auth'),
 ]

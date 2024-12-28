@@ -11,35 +11,33 @@ export interface Address {
 }
 
 export interface UserPreferences {
-  sms_notifications: boolean;
+  language: string;
+  currency: string;
+  theme: string;
   email_notifications: boolean;
-  promotions_notifications: boolean;
-  order_updates_notifications: boolean;
-  language: 'en' | 'sw';
-  currency: 'UGX' | 'USD';
+  push_notifications: boolean;
+  order_updates: boolean;
+  promotional_emails: boolean;
+  newsletter: boolean;
 }
 
 export interface User {
   id: string;
-  email?: string;
-  phone_number?: string;
+  email: string;
   first_name: string;
   last_name: string;
-  is_phone_verified: boolean;
   is_email_verified: boolean;
-  addresses: Address[];
-  preferences: UserPreferences;
   created_at: string;
   updated_at: string;
+  preferences: UserPreferences;
 }
 
 export interface RegisterData {
-  email?: string;
-  phone_number?: string;
-  password: string;
-  confirm_password: string;
+  email: string;
   first_name: string;
   last_name: string;
+  password: string;
+  confirm_password: string;
 }
 
 export interface EmailLoginData {
@@ -80,20 +78,13 @@ export interface AuthState {
   user: User | null;
   isLoading: boolean;
   error: string | null;
-  accessToken: string | null;
-  refreshToken: string | null;
 }
 
 export interface AuthContextType {
   state: AuthState;
-  register: (data: RegisterData) => Promise<void>;
-  loginWithEmail: (data: EmailLoginData) => Promise<void>;
-  loginWithPhone: (data: PhoneLoginData) => Promise<void>;
-  verifyPhone: (data: VerifyPhoneData) => Promise<void>;
+  register: (data: { email: string; password: string; first_name: string; last_name: string }) => Promise<void>;
+  loginWithEmail: (data: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
-  updateUser: (data: Partial<User>) => Promise<void>;
-  requestPasswordReset: (data: PasswordResetRequestData) => Promise<void>;
-  verifyPasswordReset: (data: PasswordResetVerifyData) => Promise<void>;
-  confirmPasswordReset: (data: PasswordResetConfirmData) => Promise<void>;
-  changePassword: (data: ChangePasswordData) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
 }

@@ -4,11 +4,13 @@ import {
   SimpleGrid,
   Text,
   VStack,
-  useBreakpointValue
+  useBreakpointValue,
+  Skeleton
 } from '@chakra-ui/react';
 import { Product } from '../types/product';
-import { mockProducts } from '../data/mockProducts';
 import { ProductCard } from './ProductCard';
+import { useState, useEffect } from 'react';
+import api from '../services/api';
 
 interface ProductRecommendationsProps {
   currentProduct: Product;
@@ -20,56 +22,90 @@ export const ProductRecommendations = ({
   recommendationType = 'similar'
 }: ProductRecommendationsProps) => {
   const columns = useBreakpointValue({ base: 1, md: 2, lg: 3 });
+  const [recommendations, setRecommendations] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const getRecommendations = (): Product[] => {
-    if (recommendationType === 'similar') {
-      // Return products in the same category
-      return mockProducts
-        .filter(p => 
-          p.id !== currentProduct.id && 
-          p.category === currentProduct.category
-        )
-        .sort((a, b) => b.rating - a.rating)
-        .slice(0, 3);
-    } else {
-      // Return complementary products based on effects or benefits
-      return mockProducts
-        .filter(p => 
-          p.id !== currentProduct.id &&
-          p.category !== currentProduct.category &&
-          (
-            p.effects.some(effect => currentProduct.effects.includes(effect)) ||
-            p.benefits.some(benefit => currentProduct.benefits.includes(benefit))
-          )
-        )
-        .sort((a, b) => b.rating - a.rating)
-        .slice(0, 3);
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        setIsLoading(true);
+        // Fetch all products
+        const response = await api.get('/api/v1/products/');
+        const allProducts = response.data;
+
+        let filtered = allProducts.filter((p: Product) => p.id !== currentProduct.id);
+
+        if (recommendationType === 'similar') {
+          // Filter products in the same category
+          filtered = filtered.filter((p: Product) => 
+            p.category === currentProduct.category
+          );
+        } else {
+          // Filter complementary products
+          filtered = filtered.filter((p: Product) => 
+            p.category !== currentProduct.category &&
+            (
+              p.effects.some(effect => currentProduct.effects.includes(effect)) ||
+              p.benefits.some(benefit => currentProduct.benefits.includes(benefit))
+            )
+          );
+        }
+
+        // Sort by average rating and take top 3
+        setRecommendations(
+          filtered
+            .sort((a: Product, b: Product) => b.average_rating - a.average_rating)
+            .slice(0, 3)
+        );
+      } catch (err) {
+        console.error('Failed to fetch recommendations:', err);
+        setError('Failed to load recommendations');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (currentProduct) {
+      fetchRecommendations();
     }
-  };
+  }, [currentProduct, recommendationType]);
 
-  const recommendations = getRecommendations();
+  if (error) {
+    return (
+      <Box py={8}>
+        <Text color="red.500">{error}</Text>
+      </Box>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Box py={8}>
+        <Heading size="md" mb={4}>
+          {recommendationType === 'similar' ? 'Similar Products' : 'You Might Also Like'}
+        </Heading>
+        <SimpleGrid columns={columns || 1} spacing={6}>
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} height="300px" />
+          ))}
+        </SimpleGrid>
+      </Box>
+    );
+  }
 
   if (recommendations.length === 0) {
     return null;
   }
 
   return (
-    <Box>
+    <Box py={8}>
       <VStack spacing={6} align="stretch">
-        <Heading size="lg">
-          {recommendationType === 'similar' 
-            ? 'Similar Products'
-            : 'You Might Also Like'}
+        <Heading size="md">
+          {recommendationType === 'similar' ? 'Similar Products' : 'You Might Also Like'}
         </Heading>
-        
-        <Text color="gray.600">
-          {recommendationType === 'similar'
-            ? 'Products similar to what you\'re viewing'
-            : 'Complementary products that work well together'}
-        </Text>
-
-        <SimpleGrid columns={columns} spacing={6}>
-          {recommendations.map(product => (
+        <SimpleGrid columns={columns || 1} spacing={6}>
+          {recommendations.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </SimpleGrid>
