@@ -29,17 +29,6 @@ DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
-# Twilio Settings
-TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
-TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
-TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER')
-
-# Debug print
-print("Loaded Twilio Settings:")
-print(f"Account SID: {TWILIO_ACCOUNT_SID}")
-print(f"Auth Token: {TWILIO_AUTH_TOKEN}")
-print(f"Phone Number: {TWILIO_PHONE_NUMBER}")
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -69,9 +58,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # CORS middleware first
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -85,7 +74,9 @@ ROOT_URLCONF = 'urbanherbapi.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR / 'templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -115,44 +106,49 @@ DATABASES = {
     }
 }
 
-# SendGrid Settings
-SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
-SENDGRID_FROM_EMAIL = 'zurizabari@icloud.com'
-
-# SendGrid Template IDs
-SENDGRID_WELCOME_TEMPLATE_ID = 'd-deb52368b88a4cd3a6c09a05fcb91694'
-SENDGRID_VERIFICATION_TEMPLATE_ID = 'd-c477f74dbafd4a1b86169a1b4f7aac6c'
-SENDGRID_PASSWORD_RESET_TEMPLATE_ID = 'd-e0655b56f5854d5d9fb66da38cba12ba'
-
 # URLs for email templates
 PRIVACY_POLICY_URL = os.getenv('PRIVACY_POLICY_URL', 'https://urbanherb.com/privacy')
 TERMS_URL = os.getenv('TERMS_URL', 'https://urbanherb.com/terms')
 
-# Email Backend Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.sendgrid.net'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'apikey'
+# Email Backend Configuration - Using Console Backend for Development
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-# JWT Settings
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.getenv('JWT_ACCESS_TOKEN_LIFETIME', 5))),
-    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=int(os.getenv('JWT_REFRESH_TOKEN_LIFETIME', 1440))),
-    'SIGNING_KEY': os.getenv('JWT_SECRET_KEY', SECRET_KEY),
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-}
+# Site framework settings
+SITE_ID = 1
+
+# Authentication settings
+AUTH_USER_MODEL = 'authentication.User'
+
+AUTHENTICATION_BACKENDS = [
+    'authentication.backends.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+LOGIN_URL = 'admin:login'
+LOGIN_REDIRECT_URL = 'admin:index'
+LOGOUT_REDIRECT_URL = 'admin:login'
+
+# Session settings
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
+SESSION_COOKIE_NAME = 'urbanherbsession'
+SESSION_COOKIE_SECURE = False  # Set to True in production
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',  # Vite dev server
-    'http://127.0.0.1:5173',
-]
+CORS_ORIGIN_ALLOW_ALL = True  # Only for development
 CORS_ALLOW_CREDENTIALS = True
-CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -166,20 +162,12 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # CSRF settings
-CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_USE_SESSIONS = False
 CSRF_COOKIE_SECURE = False  # Set to True in production
 CSRF_COOKIE_HTTPONLY = False
-CSRF_COOKIE_SAMESITE = 'Lax'
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-]
-CSRF_USE_SESSIONS = False
-
-# Session settings
-SESSION_COOKIE_SECURE = False  # Set to True in production
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = None  # Required for cross-origin requests
+CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
 
 # Swagger/OpenAPI settings
 SWAGGER_SETTINGS = {
@@ -224,6 +212,24 @@ if os.getenv('AWS_ACCESS_KEY_ID'):
     AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME')
     AWS_DEFAULT_ACL = 'public-read'
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+
+# Firebase settings
+FIREBASE_PRIVATE_KEY = os.getenv('FIREBASE_PRIVATE_KEY', '')
+if FIREBASE_PRIVATE_KEY.startswith('"') and FIREBASE_PRIVATE_KEY.endswith('"'):
+    FIREBASE_PRIVATE_KEY = FIREBASE_PRIVATE_KEY[1:-1]  # Remove surrounding quotes
+
+FIREBASE_CREDENTIALS = {
+    "type": "service_account",
+    "project_id": os.getenv('FIREBASE_PROJECT_ID', ''),
+    "private_key_id": os.getenv('FIREBASE_PRIVATE_KEY_ID', ''),
+    "private_key": FIREBASE_PRIVATE_KEY.replace('\\n', '\n'),
+    "client_email": os.getenv('FIREBASE_CLIENT_EMAIL', ''),
+    "client_id": os.getenv('FIREBASE_CLIENT_ID', ''),
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": os.getenv('FIREBASE_CLIENT_CERT_URL', '')
+}
 
 # Logging Configuration
 LOGGING = {
@@ -274,55 +280,57 @@ ENABLE_USER_REGISTRATION = os.getenv('ENABLE_USER_REGISTRATION', 'True').lower()
 ENABLE_SOCIAL_AUTH = os.getenv('ENABLE_SOCIAL_AUTH', 'False').lower() == 'true'
 ENABLE_PHONE_VERIFICATION = os.getenv('ENABLE_PHONE_VERIFICATION', 'False').lower() == 'true'
 
+# Password hashers
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+]
+
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 8,
+        }
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# Django AllAuth settings
-ACCOUNT_ADAPTER = 'authentication.adapters.CustomAccountAdapter'
-ACCOUNT_USER_MODEL_USERNAME_FIELD = None
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_AUTHENTICATION_METHOD = 'email'
-ACCOUNT_UNIQUE_EMAIL = True
-ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
-ACCOUNT_CONFIRM_EMAIL_ON_GET = True
-ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 1
-ACCOUNT_LOGIN_ATTEMPTS_LIMIT = 5
-ACCOUNT_LOGIN_ATTEMPTS_TIMEOUT = 300
-ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
-
-# REST Auth settings
-REST_AUTH = {
-    'USE_JWT': True,
-    'JWT_AUTH_COOKIE': 'access_token',
-    'JWT_AUTH_REFRESH_COOKIE': 'refresh_token',
-    'JWT_AUTH_HTTPONLY': False,
-    'SESSION_LOGIN': False,
-    'USER_DETAILS_SERIALIZER': 'authentication.serializers.auth_serializers.UserDetailsSerializer',
-    'REGISTER_SERIALIZER': 'authentication.serializers.auth_serializers.RegisterSerializer',
-}
-
-# REST Framework settings
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
-    ],
-}
 
 # dj-rest-auth settings
 REST_USE_JWT = True
 JWT_AUTH_COOKIE = 'urban-herb-auth'
 JWT_AUTH_REFRESH_COOKIE = 'urban-herb-refresh'
 
-# Custom user model
-AUTH_USER_MODEL = 'authentication.User'
+# Rest framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
 
-# Authentication settings
-AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
-    'allauth.account.auth_backends.AuthenticationBackend',
-]
+# JWT settings
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}

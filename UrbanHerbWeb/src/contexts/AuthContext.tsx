@@ -1,36 +1,23 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  AuthState,
-  AuthContextType,
-  RegisterData,
-  EmailLoginData,
-  PhoneLoginData,
-  VerifyPhoneData,
-  PasswordResetRequestData,
-  PasswordResetVerifyData,
-  PasswordResetConfirmData,
-  ChangePasswordData,
-  User,
-} from '../types/user';
-import { authApi, userApi } from '../services/api';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../config/firebase';
+import { AuthService } from '../services/auth.service';
+import { AuthState, AuthContextType, User } from '../types/user';
 
 // Initial state
 const initialState: AuthState = {
   user: null,
   isLoading: true,
   error: null,
-  accessToken: localStorage.getItem('access_token'),
-  refreshToken: localStorage.getItem('refresh_token'),
 };
 
 // Action types
 type AuthAction =
   | { type: 'AUTH_START' }
-  | { type: 'AUTH_SUCCESS'; payload: { user: User; access?: string; refresh?: string } }
+  | { type: 'AUTH_SUCCESS'; payload: User }
   | { type: 'AUTH_FAILURE'; payload: string }
-  | { type: 'AUTH_LOGOUT' }
-  | { type: 'UPDATE_USER'; payload: User };
+  | { type: 'AUTH_LOGOUT' };
 
 // Reducer
 function authReducer(state: AuthState, action: AuthAction): AuthState {
@@ -42,19 +29,11 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         error: null,
       };
     case 'AUTH_SUCCESS':
-      if (action.payload.access) {
-        localStorage.setItem('access_token', action.payload.access);
-      }
-      if (action.payload.refresh) {
-        localStorage.setItem('refresh_token', action.payload.refresh);
-      }
       return {
         ...state,
         isLoading: false,
-        user: action.payload.user,
+        user: action.payload,
         error: null,
-        accessToken: action.payload.access || state.accessToken,
-        refreshToken: action.payload.refresh || state.refreshToken,
       };
     case 'AUTH_FAILURE':
       return {
@@ -63,18 +42,9 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         error: action.payload,
       };
     case 'AUTH_LOGOUT':
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
       return {
         ...initialState,
         isLoading: false,
-        accessToken: null,
-        refreshToken: null,
-      };
-    case 'UPDATE_USER':
-      return {
-        ...state,
-        user: action.payload,
       };
     default:
       return state;
@@ -89,264 +59,127 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const navigate = useNavigate();
 
-  // Add updateUser function
-  const updateUser = async (userData: Partial<User>) => {
-    dispatch({ type: 'AUTH_START' });
-    try {
-      const response = await userApi.updateProfile(userData);
-      dispatch({
-        type: 'UPDATE_USER',
-        payload: response.data
-      });
-      return response.data;
-    } catch (error: any) {
-      dispatch({
-        type: 'AUTH_FAILURE',
-        payload: error.response?.data?.detail || 'Failed to update profile'
-      });
-      throw error;
-    }
-  };
-
-  // Check auth status on mount
+  // Check for existing tokens on mount
   useEffect(() => {
-    const checkAuth = async () => {
-      const accessToken = localStorage.getItem('access_token');
-      const refreshToken = localStorage.getItem('refresh_token');
-      
-      console.log('Checking auth status:', { accessToken, refreshToken });
-      
-      dispatch({ type: 'AUTH_START' });
-      if (accessToken) {
+    const token = localStorage.getItem('token');
+    const refreshToken = localStorage.getItem('refresh_token');
+    
+    if (!token || !refreshToken) {
+      dispatch({ type: 'AUTH_LOGOUT' });
+    }
+  }, []);
+
+  // Listen to Firebase auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
         try {
-          console.log('Fetching user profile...');
-          const response = await userApi.getProfile();
-          console.log('User profile loaded:', response.data);
+          // Get Firebase token and exchange it for Django token
+          console.log('Getting Firebase token for user:', firebaseUser.email);
+          const idToken = await firebaseUser.getIdToken(true);
           
-          dispatch({ 
-            type: 'AUTH_SUCCESS', 
-            payload: { 
-              user: response.data,
-              access: accessToken,
-              refresh: refreshToken
-            } 
-          });
+          console.log('Exchanging Firebase token for Django token');
+          const response = await AuthService.exchangeToken(idToken);
+          
+          // Store the tokens
+          localStorage.setItem('token', response.access);
+          localStorage.setItem('refresh_token', response.refresh);
+          
+          // Update state with user info
+          const user = AuthService.mapFirebaseUser(firebaseUser);
+          dispatch({ type: 'AUTH_SUCCESS', payload: user });
         } catch (error) {
-          console.error('Failed to load profile:', error);
-          dispatch({ type: 'AUTH_FAILURE', payload: 'Session expired' });
-          dispatch({ type: 'AUTH_LOGOUT' });
-          navigate('/login');
+          console.error('Error exchanging token:', error);
+          // Only log out if this is not an initial token exchange
+          if (localStorage.getItem('token')) {
+            await AuthService.logout();
+            dispatch({ type: 'AUTH_LOGOUT' });
+            navigate('/login');
+          } else {
+            dispatch({ type: 'AUTH_FAILURE', payload: 'Failed to authenticate' });
+          }
         }
       } else {
-        console.log('No access token found, logging out');
+        // No Firebase user, clear everything
+        localStorage.removeItem('token');
+        localStorage.removeItem('refresh_token');
         dispatch({ type: 'AUTH_LOGOUT' });
       }
-    };
+    });
 
-    checkAuth();
-  }, []);  // Remove navigate from dependencies to prevent unnecessary reloads
+    return () => unsubscribe();
+  }, [navigate]);
 
-  const register = async (data: RegisterData) => {
+  const register = async (data: { email: string; password: string; first_name: string; last_name: string }) => {
     dispatch({ type: 'AUTH_START' });
     try {
-      const response = await authApi.register(data);
-      
-      // Check if we have a user in the response
-      if (response.data.user) {
-        dispatch({
-          type: 'AUTH_SUCCESS',
-          payload: {
-            user: response.data.user,
-            access: response.data.access_token,
-            refresh: response.data.refresh_token,
-          },
-        });
-        
-        // Even if email verification fails, we should still redirect
-        // since the user account was created successfully
-        navigate('/verify-email');
-        
-        // If there's an email error, we can show it as a toast or notification
-        if (response.data.error === 'Failed to send verification email') {
-          console.warn('Email verification failed to send');
-          // You might want to add a toast notification here
-        }
-      } else {
-        throw new Error('Registration failed: No user data received');
-      }
+      const user = await AuthService.register(data.email, data.password, data.first_name, data.last_name);
+      dispatch({ type: 'AUTH_SUCCESS', payload: user });
+      navigate('/verify-email');
     } catch (error: any) {
-      console.error('Registration error:', error.response?.data);
-      const errorMessage = error.response?.data?.detail || 
-                       error.response?.data?.non_field_errors?.[0] ||
-                       error.response?.data?.error ||
-                       'Registration failed';
-      dispatch({
-        type: 'AUTH_FAILURE',
-        payload: errorMessage,
-      });
+      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
       throw error;
     }
   };
 
-  const loginWithEmail = async (data: EmailLoginData) => {
+  const loginWithEmail = async (data: { email: string; password: string }) => {
     dispatch({ type: 'AUTH_START' });
     try {
-      const response = await authApi.loginWithEmail(data);
-      dispatch({
-        type: 'AUTH_SUCCESS',
-        payload: {
-          user: response.data.user,
-          access: response.data.access_token,
-          refresh: response.data.refresh_token,
-        },
-      });
+      const user = await AuthService.loginWithEmail(data.email, data.password);
+      dispatch({ type: 'AUTH_SUCCESS', payload: user });
       navigate('/');
     } catch (error: any) {
-      dispatch({
-        type: 'AUTH_FAILURE',
-        payload: error.response?.data?.detail || 'Login failed',
-      });
-      throw error;
-    }
-  };
-
-  const loginWithPhone = async (data: PhoneLoginData) => {
-    dispatch({ type: 'AUTH_START' });
-    try {
-      await authApi.loginWithPhone(data);
-      dispatch({ type: 'AUTH_SUCCESS', payload: { user: null } });
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 
-                         error.response?.data?.detail || 
-                         'Failed to send verification code';
-      dispatch({
-        type: 'AUTH_FAILURE',
-        payload: errorMessage,
-      });
-      throw error;
-    }
-  };
-
-  const verifyPhone = async (data: VerifyPhoneData) => {
-    dispatch({ type: 'AUTH_START' });
-    try {
-      const response = await authApi.verifyPhone(data);
-      console.log('Verify phone response:', response.data);  // Debug log
-      
-      if (!response.data.access_token || !response.data.refresh_token) {
-        throw new Error('Invalid response format from server');
-      }
-      
-      // Save tokens to localStorage
-      localStorage.setItem('access_token', response.data.access_token);
-      localStorage.setItem('refresh_token', response.data.refresh_token);
-      
-      // Update auth state
-      dispatch({
-        type: 'AUTH_SUCCESS',
-        payload: {
-          user: response.data.user,
-          access: response.data.access_token,
-          refresh: response.data.refresh_token,
-        },
-      });
-      
-      // Navigate to home page
-      navigate('/');
-      
-    } catch (error: any) {
-      console.error('Phone verification failed:', error);  // Debug log
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.detail || 
-                          error.message ||
-                          'Verification failed';
-      dispatch({
-        type: 'AUTH_FAILURE',
-        payload: errorMessage,
-      });
+      // Clear any existing tokens on login failure
+      localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
+      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
       throw error;
     }
   };
 
   const logout = async () => {
-    authApi.logout();
-    dispatch({ type: 'AUTH_LOGOUT' });
-    navigate('/login');
-  };
-
-  const requestPasswordReset = async (data: PasswordResetRequestData) => {
-    dispatch({ type: 'AUTH_START' });
     try {
-      await authApi.requestPasswordReset(data);
-      navigate('/reset-password/verify', { state: { identifier: data.identifier } });
-    } catch (error: any) {
-      dispatch({
-        type: 'AUTH_FAILURE',
-        payload: error.response?.data?.detail || 'Password reset request failed',
-      });
-    }
-  };
-
-  const verifyPasswordReset = async (data: PasswordResetVerifyData) => {
-    dispatch({ type: 'AUTH_START' });
-    try {
-      await authApi.verifyPasswordReset(data);
-      navigate('/reset-password/confirm', {
-        state: { identifier: data.identifier, code: data.code },
-      });
-    } catch (error: any) {
-      dispatch({
-        type: 'AUTH_FAILURE',
-        payload: error.response?.data?.detail || 'Code verification failed',
-      });
-    }
-  };
-
-  const confirmPasswordReset = async (data: PasswordResetConfirmData) => {
-    dispatch({ type: 'AUTH_START' });
-    try {
-      await authApi.confirmPasswordReset(data);
+      await AuthService.logout();
+      localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
+      dispatch({ type: 'AUTH_LOGOUT' });
       navigate('/login');
     } catch (error: any) {
-      dispatch({
-        type: 'AUTH_FAILURE',
-        payload: error.response?.data?.detail || 'Password reset failed',
-      });
+      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
+      throw error;
     }
   };
 
-  const changePassword = async (data: ChangePasswordData) => {
+  const requestPasswordReset = async (email: string) => {
     dispatch({ type: 'AUTH_START' });
     try {
-      await authApi.changePassword(data);
-      dispatch({ type: 'AUTH_SUCCESS', payload: { user: state.user! } });
+      await AuthService.requestPasswordReset(email);
     } catch (error: any) {
-      dispatch({
-        type: 'AUTH_FAILURE',
-        payload: error.response?.data?.detail || 'Password change failed',
-      });
+      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
+      throw error;
     }
   };
 
-  const value: AuthContextType = {
+  const resendVerificationEmail = async () => {
+    dispatch({ type: 'AUTH_START' });
+    try {
+      await AuthService.resendVerificationEmail();
+    } catch (error: any) {
+      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
+      throw error;
+    }
+  };
+
+  const value = {
     state,
     register,
     loginWithEmail,
-    loginWithPhone,
-    verifyPhone,
     logout,
-    updateUser,
     requestPasswordReset,
-    verifyPasswordReset,
-    confirmPasswordReset,
-    changePassword,
+    resendVerificationEmail,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 // Custom hook to use auth context

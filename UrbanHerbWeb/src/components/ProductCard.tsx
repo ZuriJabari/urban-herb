@@ -105,7 +105,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           )}
         </AnimatePresence>
         <Image
-          src={product.image}
+          src={product.images?.[0]?.image || '/placeholder.jpg'}
           alt={product.name}
           objectFit="cover"
           width="100%"

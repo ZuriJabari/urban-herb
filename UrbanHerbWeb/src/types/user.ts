@@ -11,9 +11,9 @@ export interface Address {
 }
 
 export interface UserPreferences {
-  language: 'en' | 'es' | 'fr';
-  currency: 'USD' | 'EUR' | 'GBP';
-  theme: 'light' | 'dark' | 'system';
+  language: string;
+  currency: string;
+  theme: string;
   email_notifications: boolean;
   push_notifications: boolean;
   order_updates: boolean;
@@ -26,13 +26,10 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  bio?: string;
-  date_of_birth?: string;
-  gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
   is_email_verified: boolean;
-  preferences: UserPreferences;
   created_at: string;
   updated_at: string;
+  preferences: UserPreferences;
 }
 
 export interface RegisterData {
@@ -81,20 +78,13 @@ export interface AuthState {
   user: User | null;
   isLoading: boolean;
   error: string | null;
-  accessToken: string | null;
-  refreshToken: string | null;
 }
 
 export interface AuthContextType {
   state: AuthState;
-  register: (data: RegisterData) => Promise<void>;
-  loginWithEmail: (data: EmailLoginData) => Promise<void>;
-  loginWithPhone: (data: PhoneLoginData) => Promise<void>;
-  verifyPhone: (data: VerifyPhoneData) => Promise<void>;
+  register: (data: { email: string; password: string; first_name: string; last_name: string }) => Promise<void>;
+  loginWithEmail: (data: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
-  updateUser: (data: Partial<User>) => Promise<void>;
-  requestPasswordReset: (data: PasswordResetRequestData) => Promise<void>;
-  verifyPasswordReset: (data: PasswordResetVerifyData) => Promise<void>;
-  confirmPasswordReset: (data: PasswordResetConfirmData) => Promise<void>;
-  changePassword: (data: ChangePasswordData) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
 }

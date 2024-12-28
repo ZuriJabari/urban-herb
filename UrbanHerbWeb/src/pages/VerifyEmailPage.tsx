@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -6,141 +8,127 @@ import {
   Heading,
   Text,
   Button,
-  Input,
-  FormControl,
-  FormLabel,
-  FormErrorMessage,
   useToast,
-  useColorModeValue,
+  Alert,
+  AlertIcon,
+  Spinner,
 } from '@chakra-ui/react';
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 
-const MotionBox = motion(Box);
-
-const VerifyEmailPage = () => {
-  const [verificationCode, setVerificationCode] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const { state: { user }, authApi } = useAuth();
+export default function VerifyEmailPage() {
+  const { state, resendVerificationEmail, verifyEmail } = useAuth();
+  const [isResending, setIsResending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
-  
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError('');
+  useEffect(() => {
+    const token = searchParams.get('token');
+    if (token) {
+      verifyEmailWithToken(token);
+    }
+  }, [searchParams]);
 
+  const verifyEmailWithToken = async (token: string) => {
     try {
-      await authApi.verifyEmail({
-        email: user?.email || '',
-        code: verificationCode,
-      });
-
+      setIsVerifying(true);
+      await verifyEmail(token);
       toast({
-        title: 'Email verified successfully',
-        description: 'You can now proceed to login',
+        title: 'Email verified successfully!',
+        description: 'You can now use all features of the application.',
         status: 'success',
         duration: 5000,
         isClosable: true,
       });
-
-      navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Verification failed');
+      // Force reload user state and redirect
+      window.location.href = '/';
+    } catch (error: any) {
       toast({
         title: 'Verification failed',
-        description: err.response?.data?.detail || 'Please try again',
+        description: error.message,
         status: 'error',
         duration: 5000,
         isClosable: true,
       });
     } finally {
-      setIsSubmitting(false);
+      setIsVerifying(false);
     }
   };
 
-  const handleResendCode = async () => {
+  const handleResendEmail = async () => {
     try {
-      await authApi.resendEmailVerification(user?.email || '');
+      setIsResending(true);
+      await resendVerificationEmail();
       toast({
-        title: 'Verification code sent',
-        description: 'Please check your email for the new code',
+        title: 'Verification email sent!',
+        description: 'Please check your inbox for the verification link.',
         status: 'success',
         duration: 5000,
         isClosable: true,
       });
-    } catch (err: any) {
+    } catch (error: any) {
       toast({
-        title: 'Failed to send verification code',
-        description: err.response?.data?.detail || 'Please try again',
+        title: 'Failed to send email',
+        description: error.message,
         status: 'error',
         duration: 5000,
         isClosable: true,
       });
+    } finally {
+      setIsResending(false);
     }
   };
 
-  return (
-    <Container maxW="container.sm" py={10}>
-      <MotionBox
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        bg={bgColor}
-        borderWidth="1px"
-        borderColor={borderColor}
-        borderRadius="lg"
-        p={8}
-        boxShadow="lg"
-      >
-        <VStack spacing={6}>
-          <Heading size="xl">Verify Your Email</Heading>
-          <Text color="gray.600" textAlign="center">
-            We've sent a verification code to your email address.
-            Please enter it below to verify your account.
-          </Text>
+  // If user is already verified, redirect to home
+  if (state.user?.is_email_verified) {
+    navigate('/');
+    return null;
+  }
 
-          <form onSubmit={handleSubmit} style={{ width: '100%' }}>
-            <VStack spacing={4} width="100%">
-              <FormControl isInvalid={!!error}>
-                <FormLabel>Verification Code</FormLabel>
-                <Input
-                  type="text"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  placeholder="Enter verification code"
-                />
-                <FormErrorMessage>{error}</FormErrorMessage>
-              </FormControl>
-
-              <Button
-                type="submit"
-                colorScheme="green"
-                width="100%"
-                isLoading={isSubmitting}
-              >
-                Verify Email
-              </Button>
-
-              <Button
-                variant="ghost"
-                width="100%"
-                onClick={handleResendCode}
-                isDisabled={isSubmitting}
-              >
-                Resend Code
-              </Button>
-            </VStack>
-          </form>
+  if (isVerifying) {
+    return (
+      <Container maxW="md" py={10}>
+        <VStack spacing={4} align="center">
+          <Spinner size="xl" color="blue.500" />
+          <Text>Verifying your email...</Text>
         </VStack>
-      </MotionBox>
+      </Container>
+    );
+  }
+
+  return (
+    <Container maxW="md" py={10}>
+      <VStack spacing={6} align="stretch">
+        <Heading size="lg">Verify Your Email</Heading>
+
+        <Alert status="info">
+          <AlertIcon />
+          <Text>
+            We've sent a verification email to{' '}
+            <Text as="span" fontWeight="bold">
+              {state.user?.email}
+            </Text>
+          </Text>
+        </Alert>
+
+        <Text color="gray.600">
+          Please check your inbox and follow the instructions to verify your email address.
+          If you don't see the email, check your spam folder.
+        </Text>
+
+        <Button
+          colorScheme="blue"
+          onClick={handleResendEmail}
+          isLoading={isResending}
+          loadingText="Sending..."
+        >
+          Resend Verification Email
+        </Button>
+
+        <Button variant="outline" onClick={() => navigate('/')}>
+          Back to Home
+        </Button>
+      </VStack>
     </Container>
   );
-};
-
-export default VerifyEmailPage;
+}

@@ -15,6 +15,7 @@ const LoginPage = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
+      console.log('Attempting login with:', { email, password: '****' });
       await loginWithEmail({ email, password });
       toast({
         title: 'Login successful',
@@ -23,11 +24,19 @@ const LoginPage = () => {
         duration: 3000,
         isClosable: true,
       });
-      navigate('/products');
     } catch (error: any) {
+      console.error('Login error:', {
+        response: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.headers
+      });
+      const errorMessage = error.response?.data?.error || 
+                       error.response?.data?.detail ||
+                       error.response?.data?.non_field_errors?.[0] ||
+                       'Login failed. Please check your email and password.';
       toast({
         title: 'Login failed',
-        description: error.response?.data?.detail || 'Please check your email and password',
+        description: errorMessage,
         status: 'error',
         duration: 5000,
         isClosable: true,

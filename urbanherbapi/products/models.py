@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from authentication.models import User
+from django.utils.text import slugify
 import json
 
 class Brand(models.Model):
@@ -49,13 +50,13 @@ class Product(models.Model):
     ]
 
     name = models.CharField(max_length=200)
-    slug = models.SlugField(unique=True)
+    slug = models.SlugField(unique=True, blank=True)
     description = models.TextField()
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='products')
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     strain = models.CharField(max_length=20, choices=STRAIN_CHOICES, default='NA')
-    thc_content = models.CharField(max_length=10, blank=True)
-    cbd_content = models.CharField(max_length=10, blank=True)
+    thc_content = models.CharField(max_length=20, blank=True)
+    cbd_content = models.CharField(max_length=20, blank=True)
     effects = models.TextField(blank=True)  # Store as JSON string
     benefits = models.TextField(blank=True)  # Store as JSON string
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -77,6 +78,11 @@ class Product(models.Model):
     featured = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name

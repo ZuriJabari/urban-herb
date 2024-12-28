@@ -31,9 +31,9 @@ export type StrainType =
 export interface Brand {
   id: number;
   name: string;
-  description: string;
   logo?: string;
-  website?: string;
+  website: string;
+  description: string;
   created_at: string;
   updated_at: string;
 }
@@ -64,17 +64,24 @@ export interface Product {
   price: string;
   category: ProductCategory;
   brand: Brand;
-  strain: StrainType;
+  strain: string;
   thc_content: string;
   cbd_content: string;
-  effects: ProductEffect[];
+  effects: string[];
   benefits: string[];
   lab_tested: boolean;
   stock: number;
   images: ProductImage[];
-  reviews: Review[];
-  average_rating: number;
-  total_reviews: number;
+  reviews: any[];
   created_at: string;
   updated_at: string;
+  average_rating: number;
+  total_reviews: number;
+  slug?: string;
+  discount_price?: string;
+  weight?: string;
+  dosage?: string;
+  ingredients?: string;
+  usage_instructions?: string;
+  warning?: string;
 }

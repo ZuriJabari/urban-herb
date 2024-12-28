@@ -1,26 +1,22 @@
+import React from 'react';
 import { Spinner, Center, Text, VStack } from '@chakra-ui/react';
 
 interface LoadingSpinnerProps {
   text?: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 }
 
-const LoadingSpinner = ({ text, size = 'xl' }: LoadingSpinnerProps) => {
+const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ text = 'Loading...' }) => {
   return (
-    <Center minH="200px">
+    <Center h="100vh">
       <VStack spacing={4}>
         <Spinner
           thickness="4px"
           speed="0.65s"
           emptyColor="gray.200"
           color="green.500"
-          size={size}
+          size="xl"
         />
-        {text && (
-          <Text color="gray.600" fontSize="sm">
-            {text}
-          </Text>
-        )}
+        <Text color="gray.600">{text}</Text>
       </VStack>
     </Center>
   );

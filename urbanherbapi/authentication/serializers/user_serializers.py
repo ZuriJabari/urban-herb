@@ -1,8 +1,23 @@
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
 from authentication.models import (
     User, UserPreferences, SecuritySettings, 
     UserActivity, SocialConnection, Referral
 )
+
+User = get_user_model()
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'first_name', 'last_name', 'is_email_verified', 'firebase_uid')
+        read_only_fields = ('id', 'is_email_verified', 'firebase_uid')
+
+class UserDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'first_name', 'last_name', 'is_email_verified', 'firebase_uid')
+        read_only_fields = ('id', 'is_email_verified', 'firebase_uid')
 
 class UserPreferencesSerializer(serializers.ModelSerializer):
     class Meta:
@@ -23,6 +38,12 @@ class SecuritySettingsSerializer(serializers.ModelSerializer):
             'last_password_change', 'password_reset_required',
             'account_recovery_email', 'account_recovery_phone'
         ]
+
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'first_name', 'last_name')
+        read_only_fields = ('id',)
 
 class UserActivitySerializer(serializers.ModelSerializer):
     class Meta:

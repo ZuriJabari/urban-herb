@@ -11,7 +11,8 @@ class UserManager(BaseUserManager):
             raise ValueError('The Email field must be set')
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
-        user.set_password(password)
+        if password:
+            user.set_password(password)
         user.save(using=self._db)
         return user
 
@@ -19,13 +20,18 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('is_email_verified', True)
         return self.create_user(email, password, **extra_fields)
+
+    def get_by_natural_key(self, email):
+        return self.get(email=email)
 
 class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     username = None
     email = models.EmailField(_('email address'), unique=True, null=False, blank=False, default='')
     phone_number = models.CharField(_('phone number'), max_length=20, unique=True, null=True, blank=True)
+    firebase_uid = models.CharField(max_length=128, unique=True, null=True, blank=True)
     first_name = models.CharField(_('first name'), max_length=150)
     last_name = models.CharField(_('last name'), max_length=150)
     date_of_birth = models.DateField(_('date of birth'), null=True, blank=True)
@@ -46,12 +52,31 @@ class User(AbstractUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name']
 
+    def __str__(self):
+        return self.email
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
+    def get_full_name(self):
+        return self.full_name
+
+    def get_short_name(self):
+        return self.first_name
+
+    def email_user(self, subject, message, from_email=None, **kwargs):
+        """Send an email to this user."""
+        from django.core.mail import send_mail
+        send_mail(subject, message, from_email, [self.email], **kwargs)
+
+    @property
+    def is_verified(self):
+        return self.is_email_verified
+
     class Meta:
         verbose_name = _('user')
         verbose_name_plural = _('users')
-
-    def __str__(self):
-        return self.email
 
 class Address(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -121,18 +146,41 @@ class UserPreferences(models.Model):
 
 class VerificationCode(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(default='')
-    code = models.CharField(max_length=6, default='000000')
+    email = models.EmailField()
+    code = models.CharField(max_length=6)
     is_used = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(default=timezone.now)
-
+    expires_at = models.DateTimeField()
+    
     class Meta:
         verbose_name = _('verification code')
         verbose_name_plural = _('verification codes')
-
+        indexes = [
+            models.Index(fields=['email', 'code', 'is_used']),
+            models.Index(fields=['email', 'is_used', 'expires_at']),
+        ]
+        ordering = ['-created_at']  # Most recent first
+        
     def __str__(self):
-        return f"{self.email} - {self.code}"
+        return f"{self.email} - {self.code} ({'Used' if self.is_used else 'Active'})"
+        
+    def is_valid(self):
+        """Check if the verification code is valid"""
+        now = timezone.now()
+        is_valid = not self.is_used and self.expires_at > now
+        print(f"Checking code validity for {self.code}:")
+        print(f"- Is used: {self.is_used}")
+        print(f"- Expires at: {self.expires_at}")
+        print(f"- Current time: {now}")
+        print(f"- Is valid: {is_valid}")
+        return is_valid
+        
+    def save(self, *args, **kwargs):
+        # Ensure expires_at is set
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timezone.timedelta(minutes=10)
+            print(f"Setting expiry for code {self.code} to {self.expires_at}")
+        super().save(*args, **kwargs)
 
 class SecuritySettings(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
