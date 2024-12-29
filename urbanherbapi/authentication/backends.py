@@ -13,7 +13,7 @@ class EmailBackend(ModelBackend):
                 return None
                 
             # Get the user and verify their password
-            user = User.objects.get(Q(email=email_to_use))
+            user = User.objects.get(email=email_to_use)
             if user.check_password(password):
                 return user
             return None

@@ -1,68 +1,108 @@
-import { Component, ErrorInfo, ReactNode } from 'react';
-import {
-  Box,
-  Container,
-  Heading,
-  Text,
-  Button,
-  VStack,
-  useToast,
-} from '@chakra-ui/react';
+import React from 'react';
+import { Box, Button, Heading, Text, VStack, useColorModeValue } from '@chakra-ui/react';
+import { useNavigate } from 'react-router-dom';
 
-interface Props {
-  children: ReactNode;
+interface ErrorUIProps {
+  error?: Error;
+  resetErrorBoundary?: () => void;
 }
 
-interface State {
+export const ErrorUI: React.FC<ErrorUIProps> = ({ error, resetErrorBoundary }) => {
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+
+  let heading = 'Oops! Something went wrong';
+  let message = 'An unexpected error occurred. Please try again later.';
+
+  if (error?.message) {
+    if (error.message.includes('404')) {
+      heading = 'Page Not Found';
+      message = 'The page you are looking for does not exist.';
+    } else if (error.message.includes('401')) {
+      heading = 'Unauthorized';
+      message = 'You need to be logged in to access this page.';
+    } else if (error.message.includes('403')) {
+      heading = 'Forbidden';
+      message = 'You do not have permission to access this page.';
+    } else if (error.message.includes('503')) {
+      heading = 'Service Unavailable';
+      message = 'Our service is currently unavailable. Please try again later.';
+    }
+  }
+
+  return (
+    <Box
+      minH="100vh"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      p={4}
+    >
+      <VStack
+        spacing={6}
+        bg={bgColor}
+        p={8}
+        borderRadius="lg"
+        borderWidth="1px"
+        borderColor={borderColor}
+        shadow="lg"
+        maxW="md"
+        w="full"
+        textAlign="center"
+      >
+        <Heading size="xl">{heading}</Heading>
+        <Text fontSize="lg" color="gray.600">
+          {message}
+        </Text>
+        <Button
+          colorScheme="green"
+          onClick={resetErrorBoundary}
+        >
+          Try Again
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => window.location.href = '/'}
+        >
+          Go Home
+        </Button>
+      </VStack>
+    </Box>
+  );
+};
+
+interface ErrorBoundaryState {
   hasError: boolean;
-  error: Error | null;
+  error?: Error;
 }
 
-class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false,
-    error: null,
-  };
-
-  public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+export class ErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error:', error, errorInfo);
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return {
+      hasError: true,
+      error,
+    };
   }
 
-  private handleReset = () => {
-    this.setState({ hasError: false, error: null });
-    window.location.href = '/';
-  };
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
 
-  public render() {
+  render() {
     if (this.state.hasError) {
       return (
-        <Box minH="100vh" bg="gray.50" py={20}>
-          <Container maxW="container.md">
-            <VStack spacing={8} textAlign="center">
-              <Heading color="red.500">Oops! Something went wrong</Heading>
-              <Text color="gray.600">
-                We apologize for the inconvenience. An error has occurred while
-                rendering this page.
-              </Text>
-              {this.state.error && (
-                <Text color="gray.500" fontSize="sm">
-                  Error: {this.state.error.message}
-                </Text>
-              )}
-              <Button
-                colorScheme="green"
-                size="lg"
-                onClick={this.handleReset}
-              >
-                Return to Home Page
-              </Button>
-            </VStack>
-          </Container>
-        </Box>
+        <ErrorUI
+          error={this.state.error}
+          resetErrorBoundary={() => {
+            this.setState({ hasError: false });
+            window.location.reload();
+          }}
+        />
       );
     }
 

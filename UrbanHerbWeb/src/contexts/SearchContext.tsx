@@ -13,6 +13,9 @@ const defaultFilters: SearchFilters = {
 
 const SearchContext = createContext<SearchContextType | undefined>(undefined);
 
+// Export the context
+export { SearchContext };
+
 export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [filters, setFilters] = useState<SearchFilters>(defaultFilters);
   const [results, setResults] = useState<SearchResults | null>(null);

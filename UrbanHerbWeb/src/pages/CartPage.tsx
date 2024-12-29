@@ -19,62 +19,68 @@ import {
   NumberIncrementStepper,
   NumberDecrementStepper,
   useToast,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  AlertDescription,
 } from '@chakra-ui/react';
-import { FaTrash } from 'react-icons/fa';
+import { FaTrash, FaArrowLeft } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../contexts/CartContext';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
-import { useState } from 'react';
+import { formatCurrency } from '../utils/formatters';
 
 const MotionBox = motion(Box);
 
 const CartPage = () => {
-  const { items, updateQuantity, removeFromCart, clearCart } = useCart();
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+    items,
+    updateQuantity,
+    removeItem,
+    clearCart,
+    subtotal,
+    shipping,
+    tax,
+    total,
+    loading,
+    error
+  } = useCart();
   const navigate = useNavigate();
   const toast = useToast();
 
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
 
-  // Simulate loading
-  setTimeout(() => setIsLoading(false), 1000);
-
-  const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
-  const shipping = subtotal > 100 ? 0 : 10;
-  const tax = subtotal * 0.1;
-  const total = subtotal + shipping + tax;
-
-  const handleQuantityChange = (id: string, quantity: number) => {
-    updateQuantity(id, quantity);
+  const handleQuantityChange = async (productId: number, quantity: number) => {
+    try {
+      await updateQuantity(productId, quantity);
+    } catch (error: any) {
+      // Error is handled by the context
+    }
   };
 
-  const handleRemoveItem = (id: string) => {
-    removeFromCart(id);
-    toast({
-      title: 'Item removed',
-      description: 'The item has been removed from your cart',
-      status: 'success',
-      duration: 2000,
-      isClosable: true,
-      position: 'bottom-right',
-    });
+  const handleRemoveItem = async (productId: number) => {
+    try {
+      await removeItem(productId);
+    } catch (error: any) {
+      // Error is handled by the context
+    }
   };
 
-  const handleClearCart = () => {
-    clearCart();
-    toast({
-      title: 'Cart cleared',
-      description: 'All items have been removed from your cart',
-      status: 'info',
-      duration: 2000,
-      isClosable: true,
-      position: 'bottom-right',
-    });
+  const handleClearCart = async () => {
+    try {
+      await clearCart();
+    } catch (error: any) {
+      // Error is handled by the context
+    }
   };
 
-  if (isLoading) {
+  const handleCheckout = () => {
+    navigate('/checkout');
+  };
+
+  if (loading) {
     return (
       <Box minH="100vh" py={8}>
         <Container maxW="container.xl">
@@ -82,15 +88,49 @@ const CartPage = () => {
             <Heading>Your Cart</Heading>
             <Grid templateColumns={{ base: '1fr', lg: '2fr 1fr' }} gap={8}>
               <GridItem>
-                <LoadingSkeleton count={3} type="cart" />
+                <LoadingSkeleton count={3} height="100px" />
               </GridItem>
               <GridItem>
                 <Box bg={bgColor} p={6} rounded="lg" shadow="sm">
-                  <LoadingSkeleton count={1} type="search" />
+                  <LoadingSkeleton count={4} height="24px" />
                 </Box>
               </GridItem>
             </Grid>
           </Stack>
+        </Container>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box minH="100vh" py={8}>
+        <Container maxW="container.xl">
+          <Alert
+            status="error"
+            variant="subtle"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            textAlign="center"
+            height="200px"
+            rounded="lg"
+          >
+            <AlertIcon boxSize="40px" mr={0} />
+            <AlertTitle mt={4} mb={1} fontSize="lg">
+              Error Loading Cart
+            </AlertTitle>
+            <AlertDescription maxWidth="sm">
+              {error}
+            </AlertDescription>
+            <Button
+              mt={4}
+              colorScheme="red"
+              onClick={() => window.location.reload()}
+            >
+              Try Again
+            </Button>
+          </Alert>
         </Container>
       </Box>
     );
@@ -109,9 +149,10 @@ const CartPage = () => {
               <Heading>Your Cart is Empty</Heading>
               <Text>Add some products to your cart and they will show up here</Text>
               <Button
+                leftIcon={<FaArrowLeft />}
                 colorScheme="green"
                 size="lg"
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/products')}
               >
                 Continue Shopping
               </Button>
@@ -150,7 +191,7 @@ const CartPage = () => {
                 <AnimatePresence>
                   {items.map((item, index) => (
                     <MotionBox
-                      key={item.id}
+                      key={item.product.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 20 }}
@@ -173,17 +214,24 @@ const CartPage = () => {
                           alignItems="center"
                         >
                           <Image
-                            src={item.image}
-                            alt={item.name}
+                            src={item.product.image_url}
+                            alt={item.product.name}
                             width="100px"
                             height="100px"
                             objectFit="cover"
                             rounded="md"
+                            fallbackSrc="https://via.placeholder.com/100"
                           />
                           <Box>
-                            <Text fontWeight="semibold">{item.name}</Text>
+                            <Text
+                              fontWeight="semibold"
+                              _hover={{ color: 'green.500', cursor: 'pointer' }}
+                              onClick={() => navigate(`/products/${item.product.id}`)}
+                            >
+                              {item.product.name}
+                            </Text>
                             <Text fontSize="sm" color="gray.600">
-                              ${item.price}
+                              {formatCurrency(item.product.price)}
                             </Text>
                           </Box>
                           <NumberInput
@@ -191,7 +239,7 @@ const CartPage = () => {
                             max={10}
                             value={item.quantity}
                             onChange={(_, value) =>
-                              handleQuantityChange(item.id, value)
+                              handleQuantityChange(item.product.id, value)
                             }
                             size="sm"
                             maxW={20}
@@ -207,7 +255,7 @@ const CartPage = () => {
                             icon={<FaTrash />}
                             variant="ghost"
                             colorScheme="red"
-                            onClick={() => handleRemoveItem(item.id)}
+                            onClick={() => handleRemoveItem(item.product.id)}
                           />
                         </Grid>
                       </Box>
@@ -218,58 +266,54 @@ const CartPage = () => {
             </GridItem>
 
             <GridItem>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
+              <Box
+                position="sticky"
+                top="100px"
+                bg={bgColor}
+                p={6}
+                rounded="lg"
+                shadow="sm"
+                borderWidth="1px"
+                borderColor={borderColor}
               >
-                <Box
-                  bg={bgColor}
-                  p={6}
-                  rounded="lg"
-                  shadow="sm"
-                  borderWidth="1px"
-                  borderColor={borderColor}
-                  position="sticky"
-                  top="100px"
-                >
-                  <Heading size="md" mb={6}>
-                    Order Summary
-                  </Heading>
-                  <Stack spacing={4}>
-                    <HStack justify="space-between">
-                      <Text>Subtotal</Text>
-                      <Text>${subtotal}</Text>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text>Shipping</Text>
-                      <Text>
-                        {shipping === 0 ? 'Free' : `$${shipping}`}
-                      </Text>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text>Tax</Text>
-                      <Text>${tax}</Text>
-                    </HStack>
-                    <Divider />
-                    <HStack justify="space-between" fontWeight="bold">
-                      <Text>Total</Text>
-                      <Text>${total}</Text>
-                    </HStack>
-                    <Button
-                      colorScheme="green"
-                      size="lg"
-                      w="100%"
-                      mt={4}
-                      as={motion.button}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      Proceed to Checkout
-                    </Button>
-                  </Stack>
-                </Box>
-              </motion.div>
+                <VStack spacing={4} align="stretch">
+                  <Heading size="md">Order Summary</Heading>
+                  <HStack justify="space-between">
+                    <Text>Subtotal</Text>
+                    <Text>{formatCurrency(subtotal)}</Text>
+                  </HStack>
+                  <HStack justify="space-between">
+                    <Text>Shipping</Text>
+                    <Text>
+                      {shipping === 0 ? 'Free' : formatCurrency(shipping)}
+                    </Text>
+                  </HStack>
+                  <HStack justify="space-between">
+                    <Text>Tax</Text>
+                    <Text>{formatCurrency(tax)}</Text>
+                  </HStack>
+                  <Divider />
+                  <HStack justify="space-between" fontWeight="bold">
+                    <Text>Total</Text>
+                    <Text>{formatCurrency(total)}</Text>
+                  </HStack>
+                  <Button
+                    colorScheme="green"
+                    size="lg"
+                    onClick={handleCheckout}
+                    isDisabled={items.length === 0}
+                  >
+                    Proceed to Checkout
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    leftIcon={<FaArrowLeft />}
+                    onClick={() => navigate('/products')}
+                  >
+                    Continue Shopping
+                  </Button>
+                </VStack>
+              </Box>
             </GridItem>
           </Grid>
         </Stack>

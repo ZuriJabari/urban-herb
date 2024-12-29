@@ -1,192 +1,145 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { AuthService } from '../services/auth.service';
-import { AuthState, AuthContextType, User } from '../types/user';
 
-// Initial state
-const initialState: AuthState = {
-  user: null,
-  isLoading: true,
-  error: null,
-};
-
-// Action types
-type AuthAction =
-  | { type: 'AUTH_START' }
-  | { type: 'AUTH_SUCCESS'; payload: User }
-  | { type: 'AUTH_FAILURE'; payload: string }
-  | { type: 'AUTH_LOGOUT' };
-
-// Reducer
-function authReducer(state: AuthState, action: AuthAction): AuthState {
-  switch (action.type) {
-    case 'AUTH_START':
-      return {
-        ...state,
-        isLoading: true,
-        error: null,
-      };
-    case 'AUTH_SUCCESS':
-      return {
-        ...state,
-        isLoading: false,
-        user: action.payload,
-        error: null,
-      };
-    case 'AUTH_FAILURE':
-      return {
-        ...state,
-        isLoading: false,
-        error: action.payload,
-      };
-    case 'AUTH_LOGOUT':
-      return {
-        ...initialState,
-        isLoading: false,
-      };
-    default:
-      return state;
-  }
+interface AuthContextType {
+  user: string | null;
+  loading: boolean;
+  register: (data: { email: string; password: string; first_name: string; last_name: string }) => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  clearError: () => void;
 }
 
-// Create context
-const AuthContext = createContext<AuthContextType | null>(null);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Provider component
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(authReducer, initialState);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // State
+  const [user, setUser] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Hooks
   const navigate = useNavigate();
 
-  // Check for existing tokens on mount
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const refreshToken = localStorage.getItem('refresh_token');
-    
-    if (!token || !refreshToken) {
-      dispatch({ type: 'AUTH_LOGOUT' });
+  // Clear error handler
+  const clearError = useCallback(() => setError(null), []);
+
+  // Auth handlers
+  const register = useCallback(async (data: { email: string; password: string; first_name: string; last_name: string }) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const email = await AuthService.register(data.email, data.password, data.first_name, data.last_name);
+      setUser(email);
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      setError(error.message);
+      throw error;
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  // Listen to Firebase auth state changes
+  const loginWithEmail = useCallback(async (email: string, password: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const userEmail = await AuthService.loginWithEmail(email, password);
+      setUser(userEmail);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      setError(error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      await AuthService.logout();
+      setUser(null);
+      navigate('/login');
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      setError(error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
+  // Firebase auth state listener
   useEffect(() => {
+    console.log('Setting up Firebase auth state listener');
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          // Get Firebase token and exchange it for Django token
-          console.log('Getting Firebase token for user:', firebaseUser.email);
-          const idToken = await firebaseUser.getIdToken(true);
+      try {
+        if (firebaseUser) {
+          console.log('Firebase user detected:', firebaseUser.email);
+          const storedToken = localStorage.getItem('token');
           
-          console.log('Exchanging Firebase token for Django token');
-          const response = await AuthService.exchangeToken(idToken);
-          
-          // Store the tokens
-          localStorage.setItem('token', response.access);
-          localStorage.setItem('refresh_token', response.refresh);
-          
-          // Update state with user info
-          const user = AuthService.mapFirebaseUser(firebaseUser);
-          dispatch({ type: 'AUTH_SUCCESS', payload: user });
-        } catch (error) {
-          console.error('Error exchanging token:', error);
-          // Only log out if this is not an initial token exchange
-          if (localStorage.getItem('token')) {
-            await AuthService.logout();
-            dispatch({ type: 'AUTH_LOGOUT' });
-            navigate('/login');
+          if (!storedToken) {
+            console.log('No stored token, getting fresh Firebase token');
+            const idToken = await firebaseUser.getIdToken(false);
+            
+            try {
+              const response = await AuthService.exchangeToken(idToken);
+              console.log('Token exchange successful');
+              localStorage.setItem('token', response.access);
+              localStorage.setItem('refresh_token', response.refresh);
+              setUser(firebaseUser.email);
+            } catch (tokenError) {
+              console.error('Token exchange failed:', tokenError);
+              await auth.signOut();
+              setUser(null);
+              localStorage.removeItem('token');
+              localStorage.removeItem('refresh_token');
+              throw tokenError;
+            }
           } else {
-            dispatch({ type: 'AUTH_FAILURE', payload: 'Failed to authenticate' });
+            console.log('Using stored token');
+            setUser(firebaseUser.email);
           }
+        } else {
+          console.log('No Firebase user detected');
+          setUser(null);
+          localStorage.removeItem('token');
+          localStorage.removeItem('refresh_token');
         }
-      } else {
-        // No Firebase user, clear everything
-        localStorage.removeItem('token');
-        localStorage.removeItem('refresh_token');
-        dispatch({ type: 'AUTH_LOGOUT' });
+      } catch (error) {
+        console.error('Auth state change error:', error);
+        setUser(null);
+        setError(error instanceof Error ? error.message : 'Authentication error');
+      } finally {
+        setLoading(false);
       }
     });
 
     return () => unsubscribe();
-  }, [navigate]);
+  }, []);
 
-  const register = async (data: { email: string; password: string; first_name: string; last_name: string }) => {
-    dispatch({ type: 'AUTH_START' });
-    try {
-      const user = await AuthService.register(data.email, data.password, data.first_name, data.last_name);
-      dispatch({ type: 'AUTH_SUCCESS', payload: user });
-      navigate('/verify-email');
-    } catch (error: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
-      throw error;
-    }
-  };
-
-  const loginWithEmail = async (data: { email: string; password: string }) => {
-    dispatch({ type: 'AUTH_START' });
-    try {
-      const user = await AuthService.loginWithEmail(data.email, data.password);
-      dispatch({ type: 'AUTH_SUCCESS', payload: user });
-      navigate('/');
-    } catch (error: any) {
-      // Clear any existing tokens on login failure
-      localStorage.removeItem('token');
-      localStorage.removeItem('refresh_token');
-      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
-      throw error;
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await AuthService.logout();
-      localStorage.removeItem('token');
-      localStorage.removeItem('refresh_token');
-      dispatch({ type: 'AUTH_LOGOUT' });
-      navigate('/login');
-    } catch (error: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
-      throw error;
-    }
-  };
-
-  const requestPasswordReset = async (email: string) => {
-    dispatch({ type: 'AUTH_START' });
-    try {
-      await AuthService.requestPasswordReset(email);
-    } catch (error: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
-      throw error;
-    }
-  };
-
-  const resendVerificationEmail = async () => {
-    dispatch({ type: 'AUTH_START' });
-    try {
-      await AuthService.resendVerificationEmail();
-    } catch (error: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
-      throw error;
-    }
-  };
-
+  // Context value
   const value = {
-    state,
+    user,
+    loading,
     register,
     loginWithEmail,
     logout,
-    requestPasswordReset,
-    resendVerificationEmail,
+    clearError,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+};
 
-// Custom hook to use auth context
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};
