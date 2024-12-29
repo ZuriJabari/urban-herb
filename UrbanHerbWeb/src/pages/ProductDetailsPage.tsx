@@ -31,67 +31,119 @@ import { useWishlist } from '../contexts/WishlistContext';
 import { ProductRecommendations } from '../components/ProductRecommendations';
 import { Reviews } from '../components/Reviews';
 import LoadingSpinner from '../components/LoadingSpinner';
-import api from '../services/api';
+import { ProductService } from '../services/product.service';
 import { useState, useEffect } from 'react';
 
 export const ProductDetailsPage = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { addItem } = useCart();
-  const { addItem: addToWishlist, removeItem: removeFromWishlist, isInWishlist } = useWishlist();
+  const { addToCart } = useCart();
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const toast = useToast();
 
   useEffect(() => {
     const fetchProduct = async () => {
-      if (!id) {
-        console.error('No product ID provided');
-        setError('Invalid product ID');
+      if (!slug) {
+        setError('Product not found');
+        setIsLoading(false);
         return;
       }
-      
+
       try {
         setIsLoading(true);
-        console.log('Fetching product with ID:', id);
-        const response = await api.get(`/api/v1/products/${id}/`);
-        console.log('Raw API response:', response);
-        
-        if (!response.data) {
-          console.error('No data in API response');
-          setError('Failed to load product details - no data received');
-          return;
-        }
-
-        console.log('Setting product data:', response.data);
-        setProduct(response.data);
-      } catch (err) {
-        console.error('Failed to fetch product:', err);
-        console.error('Error details:', {
-          message: err.message,
-          status: err.response?.status,
-          data: err.response?.data,
-          config: err.config
+        setError(null);
+        console.log('ProductDetailsPage: Fetching product with slug:', slug);
+        const productData = await ProductService.getProductBySlug(slug);
+        setProduct(productData);
+        console.log('ProductDetailsPage: Product fetched:', productData);
+      } catch (error: any) {
+        console.error('ProductDetailsPage: Error fetching product:', error);
+        setError(error.message || 'Failed to load product details');
+        toast({
+          title: 'Error',
+          description: 'Failed to load product details',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
         });
-        setError('Failed to load product details');
       } finally {
         setIsLoading(false);
       }
     };
 
-    console.log('ProductDetailsPage mounted with ID:', id);
     fetchProduct();
-  }, [id]);
+  }, [slug, toast]);
 
-  // Early return if no ID
-  if (!id) {
-    console.log('Rendering: No product ID');
+  const handleAddToCart = async () => {
+    if (!product) return;
+
+    try {
+      await addToCart(product, 1);
+      toast({
+        title: 'Success',
+        description: `${product.name} added to cart`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error: any) {
+      console.error('ProductDetailsPage: Error adding to cart:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to add item to cart',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleWishlistToggle = async () => {
+    if (!product) return;
+
+    try {
+      if (isInWishlist(product.id)) {
+        await removeFromWishlist(product.id);
+        toast({
+          title: 'Success',
+          description: `${product.name} removed from wishlist`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        await addToWishlist(product);
+        toast({
+          title: 'Success',
+          description: `${product.name} added to wishlist`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (error: any) {
+      console.error('ProductDetailsPage: Error toggling wishlist:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update wishlist',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  // Early return if no slug
+  if (!slug) {
+    console.log('Rendering: No product slug');
     return (
       <Container maxW="container.xl" py={8}>
         <Alert status="error">
           <AlertIcon />
-          Invalid product ID
+          Invalid product slug
         </Alert>
       </Container>
     );
@@ -121,46 +173,6 @@ export const ProductDetailsPage = () => {
   }
 
   console.log('Rendering: Product details', product);
-
-  const handleAddToCart = () => {
-    if (!product) return;
-    
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      image: product.images?.[0]?.image || '',
-      quantity: 1
-    });
-    
-    toast({
-      title: 'Added to cart',
-      description: `${product.name} has been added to your cart`,
-      status: 'success',
-      duration: 2000,
-      isClosable: true,
-    });
-  };
-
-  const toggleWishlist = () => {
-    if (!product) return;
-    
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
-      toast({
-        title: 'Removed from wishlist',
-        status: 'info',
-        duration: 2000,
-      });
-    } else {
-      addToWishlist(product);
-      toast({
-        title: 'Added to wishlist',
-        status: 'success',
-        duration: 2000,
-      });
-    }
-  };
 
   return (
     <Container maxW="container.xl" py={8}>
@@ -230,7 +242,7 @@ export const ProductDetailsPage = () => {
               colorScheme={isInWishlist(product.id) ? 'red' : 'gray'}
               size="lg"
               leftIcon={<Icon as={FaHeart} />}
-              onClick={toggleWishlist}
+              onClick={handleWishlistToggle}
             >
               {isInWishlist(product.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
             </Button>

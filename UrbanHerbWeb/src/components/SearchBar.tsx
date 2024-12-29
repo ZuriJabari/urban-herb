@@ -28,6 +28,7 @@ import debounce from 'lodash/debounce';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types/product';
 import { SearchFilters } from './SearchFilters';
+import { useDebounce } from '../hooks/useDebounce';
 
 const MotionBox = motion(Box);
 

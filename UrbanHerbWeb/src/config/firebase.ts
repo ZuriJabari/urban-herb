@@ -1,27 +1,28 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 
-// Log Firebase configuration (without sensitive values)
-const configCheck = {
-  apiKey: !!import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: !!import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: !!import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: !!import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: !!import.meta.env.VITE_FIREBASE_APP_ID,
-};
+// Validate required environment variables
+const requiredVars = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID'
+] as const;
 
-console.log('Firebase Config Check:', configCheck);
+// Check for missing environment variables
+const missingVars = requiredVars.filter(
+  (varName) => !import.meta.env[varName]
+);
 
-// Log any missing configurations
-const missingConfigs = Object.entries(configCheck)
-  .filter(([_, value]) => !value)
-  .map(([key]) => key);
-
-if (missingConfigs.length > 0) {
-  console.error('Missing Firebase configurations:', missingConfigs);
+if (missingVars.length > 0) {
+  throw new Error(
+    `Missing required environment variables: ${missingVars.join(', ')}`
+  );
 }
 
+// Firebase configuration
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -31,25 +32,28 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-let app;
-let auth;
+// Log configuration check (without sensitive values)
+console.log('Firebase Config Check:', {
+  apiKey: !!firebaseConfig.apiKey,
+  authDomain: !!firebaseConfig.authDomain,
+  projectId: !!firebaseConfig.projectId,
+  storageBucket: !!firebaseConfig.storageBucket,
+  messagingSenderId: !!firebaseConfig.messagingSenderId,
+  appId: !!firebaseConfig.appId,
+});
 
+let app;
 try {
-  console.log('Initializing Firebase with project ID:', firebaseConfig.projectId);
-  app = initializeApp(firebaseConfig);
-  console.log('Firebase initialized successfully');
-  
-  // Get Auth instance
-  auth = getAuth(app);
-  console.log('Firebase Auth initialized');
+  // Initialize Firebase only if it hasn't been initialized
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  console.log('Firebase initialized successfully with project:', firebaseConfig.projectId);
 } catch (error) {
   console.error('Error initializing Firebase:', error);
-  console.error('Firebase config used:', {
-    ...firebaseConfig,
-    apiKey: firebaseConfig.apiKey ? '[HIDDEN]' : undefined
-  });
   throw error;
 }
+
+// Initialize Auth
+const auth = getAuth(app);
 
 export { auth };
 export default app;

@@ -1,87 +1,79 @@
-export type ProductCategory = 
-  | 'FLOWERS' 
-  | 'EDIBLES' 
-  | 'CONCENTRATES' 
-  | 'VAPES' 
-  | 'TINCTURES' 
-  | 'TOPICALS'
-  | 'ACCESSORIES'
-  | 'PRE_ROLLS'
-  | 'SEEDS';
-
-export type ProductEffect = 
-  | 'RELAXING'
-  | 'ENERGIZING'
-  | 'CREATIVE'
-  | 'SLEEPY'
-  | 'FOCUSED'
-  | 'UPLIFTED'
-  | 'HAPPY'
-  | 'PAIN_RELIEF'
-  | 'STRESS_RELIEF'
-  | 'ANXIETY_RELIEF';
-
-export type StrainType = 
-  | 'SATIVA'
-  | 'INDICA'
-  | 'HYBRID'
-  | 'CBD'
-  | 'NA';
-
-export interface Brand {
+export interface CBDEffect {
   id: number;
   name: string;
-  logo?: string;
-  website: string;
   description: string;
-  created_at: string;
-  updated_at: string;
+  icon: string;
 }
 
-export interface Review {
+export interface ProductImage {
   id: number;
-  user: number;
-  user_email: string;
+  image: string;
+  alt_text?: string;
+  is_primary: boolean;
+}
+
+export interface ProductReview {
+  id: number;
+  user: {
+    id: number;
+    username: string;
+  };
   rating: number;
   title: string;
   content: string;
   created_at: string;
 }
 
-export interface ProductImage {
+export interface ProductEffect {
   id: number;
-  image: string;
-  alt_text: string;
-  is_primary: boolean;
-  created_at: string;
-  product: number;
+  name: string;
+  description: string;
+}
+
+export interface ProductBrand {
+  id: number;
+  name: string;
+  logo?: string;
+  description?: string;
 }
 
 export interface Product {
   id: number;
+  slug: string;
   name: string;
   description: string;
-  price: string;
-  category: ProductCategory;
-  brand: Brand;
-  strain: string;
-  thc_content: string;
-  cbd_content: string;
-  effects: string[];
-  benefits: string[];
-  lab_tested: boolean;
+  price: number;
+  discount_price?: number;
   stock: number;
-  images: ProductImage[];
-  reviews: any[];
-  created_at: string;
-  updated_at: string;
-  average_rating: number;
-  total_reviews: number;
-  slug?: string;
-  discount_price?: string;
+  category: string;
+  strain?: string;
+  thc_content?: string;
+  cbd_content?: string;
   weight?: string;
-  dosage?: string;
-  ingredients?: string;
+  lab_tested: boolean;
+  featured: boolean;
+  average_rating: number;
+  review_count: number;
   usage_instructions?: string;
   warning?: string;
+  images: ProductImage[];
+  effects: ProductEffect[];
+  brand?: ProductBrand;
+}
+
+export interface ProductFilters {
+  category?: string;
+  effects?: number[];
+  searchQuery?: string;
+  sortBy?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minRating?: number;
+  inStock?: boolean;
+  featured?: boolean;
+}
+
+export type SortOption = {
+  value: string;
+  label: string;
 }

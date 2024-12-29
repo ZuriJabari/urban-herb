@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
 from .models import User, Address, UserPreferences, VerificationCode
 
 class AddressInline(admin.TabularInline):
@@ -14,13 +15,15 @@ class PreferencesInline(admin.TabularInline):
 
 class CustomUserCreationForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
-        model = User
-        fields = ('email', 'first_name', 'last_name')
-        
+        model = get_user_model()
+        fields = ('email',)
+        field_classes = {}
+
 class CustomUserChangeForm(UserChangeForm):
     class Meta(UserChangeForm.Meta):
-        model = User
-        fields = ('email', 'first_name', 'last_name')
+        model = get_user_model()
+        fields = ('email',)
+        field_classes = {}
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
@@ -36,16 +39,20 @@ class CustomUserAdmin(UserAdmin):
         (None, {'fields': ('email', 'password')}),
         (_('Personal info'), {'fields': ('first_name', 'last_name')}),
         (_('Permissions'), {
-            'fields': ('is_active', 'is_staff', 'is_superuser', 'is_email_verified'),
+            'fields': ('is_active', 'is_staff', 'is_superuser', 'is_email_verified', 'groups', 'user_permissions'),
         }),
+        (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
     )
     
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('email', 'first_name', 'last_name', 'password1', 'password2', 'is_staff', 'is_active', 'is_email_verified'),
+            'fields': ('email', 'password1', 'password2'),
         }),
     )
+
+    # Override username field with email
+    username_field = 'email'
     
     def get_fieldsets(self, request, obj=None):
         if not obj:

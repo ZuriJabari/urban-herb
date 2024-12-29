@@ -1,17 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   SimpleGrid,
   Box,
-  Image,
   Text,
   HStack,
   Icon,
   VStack,
-  Button,
-  Select,
-  Input,
-  Flex,
   useToast,
   Spinner,
   Center,
@@ -19,172 +14,249 @@ import {
   AlertIcon,
   AlertTitle,
   AlertDescription,
+  Grid,
+  GridItem,
+  Input,
+  InputGroup,
+  InputLeftElement,
+  useColorModeValue,
+  Button,
+  Flex,
+  Select,
+  Heading,
 } from '@chakra-ui/react';
-import { Link } from 'react-router-dom';
-import { FaStar } from 'react-icons/fa';
+import { FaStar, FaSearch, FaFilter } from 'react-icons/fa';
 import { ProductService } from '../services/product.service';
-import { Product, ProductCategory } from '../types/product';
+import { Product } from '../types/product';
+import { ProductCard } from '../components/ProductCard';
+import { ProductFiltersPanel } from '../components/ProductFilters';
+import { useDebounce } from '../hooks/useDebounce';
+import { useSearchParams } from 'react-router-dom';
+
+const DEFAULT_FILTERS = {
+  category: '',
+  minPrice: 0,
+  maxPrice: 200,
+  minRating: 0,
+  inStock: false,
+  sortBy: 'newest',
+  searchQuery: '',
+};
+
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest First' },
+  { value: 'price_asc', label: 'Price: Low to High' },
+  { value: 'price_desc', label: 'Price: High to Low' },
+  { value: 'rating_desc', label: 'Highest Rated' },
+];
 
 export const ProductsPage: React.FC = () => {
+  // URL params
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // State
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [category, setCategory] = useState<ProductCategory | ''>('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState(() => {
+    // Initialize filters from URL params or defaults
+    const initialFilters = { ...DEFAULT_FILTERS };
+    searchParams.forEach((value, key) => {
+      if (key in DEFAULT_FILTERS) {
+        if (key === 'inStock') {
+          initialFilters[key] = value === 'true';
+        } else if (['minPrice', 'maxPrice', 'minRating'].includes(key)) {
+          initialFilters[key] = Number(value);
+        } else {
+          initialFilters[key] = value;
+        }
+      }
+    });
+    console.log('Initial filters:', initialFilters);
+    return initialFilters;
+  });
+
+  // Hooks
   const toast = useToast();
+  const bgColor = useColorModeValue('gray.50', 'gray.900');
+  const [debouncedFilters] = useDebounce(filters, 500);
 
-  useEffect(() => {
-    loadProducts();
-  }, [category, searchQuery]);
-
-  const loadProducts = async () => {
+  // Fetch products
+  const fetchProducts = useCallback(async () => {
     try {
+      console.log('Fetching products with filters:', debouncedFilters);
       setIsLoading(true);
       setError(null);
-      const response = await ProductService.getProducts(category, searchQuery);
+
+      const response = await ProductService.getProducts(debouncedFilters);
+      console.log('Products response:', response);
+
+      if (!response || response.length === 0) {
+        console.log('No products found');
+        setProducts([]);
+        return;
+      }
+
       setProducts(response);
+      console.log('Products loaded:', response.length);
     } catch (error: any) {
-      const errorMessage = error.message || 'Failed to load products';
-      setError(errorMessage);
+      console.error('Error fetching products:', error);
+      setError(error.message || 'Failed to load products');
       toast({
-        title: 'Error loading products',
-        description: errorMessage,
+        title: 'Error',
+        description: error.message || 'Failed to load products',
         status: 'error',
         duration: 5000,
         isClosable: true,
       });
-      setProducts([]);
     } finally {
       setIsLoading(false);
     }
+  }, [debouncedFilters, toast]);
+
+  // Effects
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  useEffect(() => {
+    // Update URL when filters change
+    const params = new URLSearchParams();
+    Object.entries(debouncedFilters).forEach(([key, value]) => {
+      if (value !== undefined && value !== '' && value !== DEFAULT_FILTERS[key]) {
+        params.set(key, String(value));
+      }
+    });
+    setSearchParams(params);
+  }, [debouncedFilters, setSearchParams]);
+
+  // Handlers
+  const handleFilterChange = (newFilters: Partial<typeof DEFAULT_FILTERS>) => {
+    console.log('Filter change:', newFilters);
+    setFilters(prev => ({
+      ...prev,
+      ...newFilters
+    }));
   };
 
-  const handleSearch = () => {
-    loadProducts();
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const searchQuery = event.target.value;
+    console.log('Search query:', searchQuery);
+    handleFilterChange({ searchQuery });
+  };
+
+  const handleSortChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const sortBy = event.target.value;
+    console.log('Sort change:', sortBy);
+    handleFilterChange({ sortBy });
+  };
+
+  const resetFilters = () => {
+    console.log('Resetting filters');
+    setFilters(DEFAULT_FILTERS);
+    setSearchParams(new URLSearchParams());
   };
 
   if (isLoading) {
     return (
-      <Center minH="60vh">
+      <Center h="100vh">
         <VStack spacing={4}>
-          <Spinner size="xl" color="green.500" thickness="4px" />
+          <Spinner size="xl" />
           <Text>Loading products...</Text>
         </VStack>
       </Center>
     );
   }
 
-  if (error) {
-    return (
-      <Container maxW="container.xl" py={8}>
-        <Alert status="error" borderRadius="md">
-          <AlertIcon />
-          <Box>
-            <AlertTitle>Error loading products</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Box>
-        </Alert>
-        <Button mt={4} onClick={loadProducts}>
-          Try Again
-        </Button>
-      </Container>
-    );
-  }
-
   return (
     <Container maxW="container.xl" py={8}>
-      <VStack spacing={8} width="100%">
-        <Flex
-          width="100%"
-          gap={4}
-          direction={{ base: 'column', md: 'row' }}
-          mb={8}
-        >
-          <Select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as ProductCategory | '')}
-            placeholder="All Categories"
-          >
-            <option value="FLOWERS">Flowers</option>
-            <option value="EDIBLES">Edibles</option>
-            <option value="CONCENTRATES">Concentrates</option>
-            <option value="VAPES">Vapes</option>
-            <option value="TINCTURES">Tinctures</option>
-            <option value="TOPICALS">Topicals</option>
-            <option value="ACCESSORIES">Accessories</option>
-            <option value="PRE_ROLLS">Pre-Rolls</option>
-            <option value="SEEDS">Seeds</option>
-          </Select>
-          <HStack flex={1}>
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search products..."
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            />
-            <Button onClick={handleSearch}>Search</Button>
+      <VStack spacing={6} align="stretch">
+        {/* Header */}
+        <Flex justify="space-between" align="center" wrap="wrap" gap={4}>
+          <Heading size="lg">Products</Heading>
+          <HStack spacing={4}>
+            <Button
+              leftIcon={<FaFilter />}
+              onClick={() => setShowFilters(!showFilters)}
+              display={{ base: 'flex', md: 'none' }}
+            >
+              {showFilters ? 'Hide Filters' : 'Show Filters'}
+            </Button>
+            <Select
+              value={filters.sortBy}
+              onChange={handleSortChange}
+              w={{ base: 'full', md: '200px' }}
+            >
+              {SORT_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
           </HStack>
         </Flex>
 
-        {products.length === 0 ? (
-          <Box textAlign="center" py={8}>
-            <Text fontSize="lg" color="gray.600">
-              No products found. Try adjusting your search or category filter.
-            </Text>
-          </Box>
-        ) : (
-          <SimpleGrid
-            columns={{ base: 1, sm: 2, md: 3, lg: 4 }}
-            spacing={6}
-            width="100%"
-          >
-            {products.map((product) => (
-              <Link key={product.id} to={`/products/${product.id}`}>
-                <Box
-                  borderWidth="1px"
-                  borderRadius="lg"
-                  overflow="hidden"
-                  transition="transform 0.2s"
-                  _hover={{ transform: 'scale(1.02)' }}
-                >
-                  <Image
-                    src={product.images[0]?.image || '/placeholder.jpg'}
-                    alt={product.name}
-                    height="200px"
-                    width="100%"
-                    objectFit="cover"
-                    fallback={
-                      <Center height="200px" bg="gray.100">
-                        <Text color="gray.500">No image</Text>
-                      </Center>
-                    }
-                  />
-                  <Box p={4}>
-                    <Text
-                      fontWeight="semibold"
-                      fontSize="lg"
-                      noOfLines={2}
-                      mb={2}
-                    >
-                      {product.name}
-                    </Text>
-                    <HStack justify="space-between" mb={2}>
-                      <Text color="gray.600">{product.category}</Text>
-                      <HStack>
-                        <Icon as={FaStar} color="yellow.400" />
-                        <Text>{product.average_rating.toFixed(1)}</Text>
-                      </HStack>
-                    </HStack>
-                    <Text fontWeight="bold" fontSize="xl" color="green.600">
-                      ${parseFloat(product.price).toFixed(2)}
-                    </Text>
-                  </Box>
-                </Box>
-              </Link>
-            ))}
-          </SimpleGrid>
+        {error && (
+          <Alert status="error">
+            <AlertIcon />
+            <AlertTitle>Error!</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
+
+        <Grid
+          templateColumns={{ base: '1fr', md: '250px 1fr' }}
+          gap={6}
+        >
+          {/* Filters Panel */}
+          <GridItem display={{ base: showFilters ? 'block' : 'none', md: 'block' }}>
+            <ProductFiltersPanel
+              filters={filters}
+              onFilterChange={handleFilterChange}
+              onReset={resetFilters}
+            />
+          </GridItem>
+
+          {/* Products Grid */}
+          <GridItem>
+            {/* Search Bar */}
+            <VStack spacing={6} align="stretch">
+              <InputGroup>
+                <InputLeftElement pointerEvents="none">
+                  <Icon as={FaSearch} color="gray.400" />
+                </InputLeftElement>
+                <Input
+                  placeholder="Search products..."
+                  value={filters.searchQuery}
+                  onChange={handleSearchChange}
+                  bg={bgColor}
+                />
+              </InputGroup>
+
+              {/* Products */}
+              {products.length > 0 ? (
+                <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={6}>
+                  {products.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </SimpleGrid>
+              ) : (
+                <Center py={10}>
+                  <VStack spacing={3}>
+                    <Text>No products found</Text>
+                    <Button onClick={resetFilters} colorScheme="blue">
+                      Reset Filters
+                    </Button>
+                  </VStack>
+                </Center>
+              )}
+            </VStack>
+          </GridItem>
+        </Grid>
       </VStack>
     </Container>
   );
 };
+
+export default ProductsPage;

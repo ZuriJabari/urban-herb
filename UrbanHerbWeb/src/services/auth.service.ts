@@ -8,172 +8,164 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
-import { User } from '../types/user';
 import api from './axios';
 
 export class AuthService {
-  static async register(email: string, password: string, firstName: string, lastName: string): Promise<User> {
+  static async register(email: string, password: string, firstName: string, lastName: string): Promise<string> {
     try {
+      console.log('Starting registration process for:', email);
+      
+      // Create Firebase user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      console.log('Firebase user created successfully');
       
-      // Update profile with name
-      await updateProfile(userCredential.user, {
-        displayName: `${firstName} ${lastName}`,
-      });
-      
-      // Send verification email
-      await sendEmailVerification(userCredential.user);
+      try {
+        // Update profile with name
+        await updateProfile(userCredential.user, {
+          displayName: `${firstName} ${lastName}`,
+        });
+        console.log('User profile updated with name');
+        
+        // Send verification email
+        await sendEmailVerification(userCredential.user);
+        console.log('Verification email sent');
+      } catch (profileError) {
+        console.error('Error updating profile or sending verification:', profileError);
+      }
       
       // Get Firebase ID token
       const idToken = await userCredential.user.getIdToken();
+      console.log('Got Firebase token');
       
-      // Exchange Firebase token for Django token
-      const response = await this.exchangeToken(idToken);
-      localStorage.setItem('token', response.access);
-      localStorage.setItem('refresh_token', response.refresh);
+      try {
+        // Exchange Firebase token for Django token
+        const response = await this.exchangeToken(idToken);
+        console.log('Token exchange successful');
+        localStorage.setItem('token', response.access);
+        localStorage.setItem('refresh_token', response.refresh);
+      } catch (tokenError) {
+        console.error('Token exchange failed:', tokenError);
+        // Clean up if token exchange fails
+        await signOut(auth);
+        throw tokenError;
+      }
       
-      return this.mapFirebaseUser(userCredential.user);
+      return userCredential.user.email || '';
     } catch (error: any) {
       console.error('Registration error:', error);
       throw this.handleAuthError(error);
     }
   }
 
-  static async loginWithEmail(email: string, password: string): Promise<User> {
+  static async loginWithEmail(email: string, password: string): Promise<string> {
     try {
-      console.log('Attempting login with email:', email);
+      // Sign in with Firebase
+      console.log('Attempting Firebase login:', email);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       console.log('Firebase login successful:', userCredential.user.email);
       
-      // Get the Firebase token
+      // Get Firebase token
       const idToken = await userCredential.user.getIdToken(true);
-      console.log('Got Firebase token:', {
-        length: idToken.length,
-        prefix: idToken.substring(0, 10) + '...'
-      });
+      console.log('Got Firebase token');
       
-      // Exchange Firebase token for Django token
-      console.log('Exchanging Firebase token for Django token...');
-      const tokens = await this.exchangeToken(idToken);
+      // Exchange token with backend
+      console.log('Exchanging token with backend...');
+      const response = await this.exchangeToken(idToken);
       console.log('Token exchange successful');
       
       // Store tokens
-      localStorage.setItem('token', tokens.access);
-      localStorage.setItem('refresh_token', tokens.refresh);
+      localStorage.setItem('token', response.access);
+      localStorage.setItem('refresh_token', response.refresh);
       
-      return this.mapFirebaseUser(userCredential.user);
+      return userCredential.user.email || '';
     } catch (error: any) {
-      console.error('Login error details:', {
-        code: error.code,
-        message: error.message,
-        response: error.response?.data
-      });
-      throw new Error(error.message);
+      console.error('Login error:', error);
+      // Clean up if anything fails
+      try {
+        await signOut(auth);
+      } catch (signOutError) {
+        console.error('Error during cleanup signout:', signOutError);
+      }
+      throw this.handleAuthError(error);
     }
   }
 
   static async logout(): Promise<void> {
     try {
+      console.log('Starting logout process');
       await signOut(auth);
-      localStorage.removeItem('token');
-      localStorage.removeItem('refresh_token');
+      console.log('Firebase signOut successful');
     } catch (error: any) {
       console.error('Logout error:', error);
       throw this.handleAuthError(error);
-    }
-  }
-
-  static async requestPasswordReset(email: string): Promise<void> {
-    try {
-      await sendPasswordResetEmail(auth, email);
-    } catch (error: any) {
-      console.error('Password reset request error:', error);
-      throw this.handleAuthError(error);
-    }
-  }
-
-  static async resendVerificationEmail(): Promise<void> {
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('No user is currently signed in');
-      }
-      await sendEmailVerification(user);
-    } catch (error: any) {
-      console.error('Resend verification error:', error);
-      throw this.handleAuthError(error);
+    } finally {
+      // Always clear tokens
+      localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
+      console.log('Local storage cleared');
     }
   }
 
   static async exchangeToken(firebaseToken: string): Promise<{ access: string; refresh: string }> {
     try {
-      const endpoint = '/api/v1/auth/firebase-token/';
-      const baseURL = import.meta.env.VITE_API_URL;
-      
-      console.log('Token exchange configuration:', {
-        baseURL,
-        endpoint,
-        fullURL: `${baseURL}${endpoint}`,
-        tokenLength: firebaseToken.length,
-        tokenPrefix: firebaseToken.substring(0, 10) + '...'
-      });
-      
-      const response = await api.post(endpoint, { 
-        token: firebaseToken 
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-      
-      console.log('Token exchange response:', {
-        status: response.status,
-        statusText: response.statusText,
-        data: response.data,
-        headers: response.headers
-      });
-      
-      if (!response.data.access || !response.data.refresh) {
-        console.error('Invalid response format:', response.data);
-        throw new Error('Invalid response format from server');
-      }
-      
-      return {
-        access: response.data.access,
-        refresh: response.data.refresh
-      };
-    } catch (error: any) {
-      console.error('Token exchange error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers,
-        config: {
-          url: error.config?.url,
-          baseURL: error.config?.baseURL,
-          headers: error.config?.headers
-        }
-      });
-      throw new Error(error.response?.data?.error || 'Failed to exchange Firebase token for Django token');
+      console.log('Exchanging Firebase token');
+      const response = await api.post('/auth/firebase-token/', { token: firebaseToken });
+      console.log('Token exchange successful');
+      return response.data;
+    } catch (error) {
+      console.error('Token exchange failed:', error);
+      throw error;
     }
   }
 
-  static mapFirebaseUser(firebaseUser: FirebaseUser): User {
-    const [firstName, ...lastNameParts] = (firebaseUser.displayName || '').split(' ');
-    const lastName = lastNameParts.join(' ');
+  static async refreshToken(): Promise<string> {
+    try {
+      console.log('Refreshing token');
+      const refreshToken = localStorage.getItem('refresh_token');
+      
+      if (!refreshToken) {
+        console.error('No refresh token found');
+        throw new Error('No refresh token available');
+      }
 
-    return {
-      id: firebaseUser.uid,
-      email: firebaseUser.email || '',
-      first_name: firstName || '',
-      last_name: lastName || '',
-      is_email_verified: firebaseUser.emailVerified,
-      phone_number: firebaseUser.phoneNumber || null,
-    };
+      const response = await api.post('/auth/token/refresh/', {
+        refresh: refreshToken
+      });
+
+      console.log('Token refresh successful');
+      const { access } = response.data;
+      localStorage.setItem('token', access);
+      return access;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      // Clean up on refresh failure
+      localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
+      try {
+        await signOut(auth);
+      } catch (signOutError) {
+        console.error('Error during cleanup signout:', signOutError);
+      }
+      throw error;
+    }
   }
 
   private static handleAuthError(error: any): Error {
+    console.error('Auth error details:', {
+      code: error.code,
+      message: error.message,
+      response: error.response?.data
+    });
+
+    // Network errors
+    if (!navigator.onLine) {
+      return new Error('No internet connection. Please check your network.');
+    }
+
+    if (error.message?.includes('network')) {
+      return new Error('Network error. Please check your internet connection.');
+    }
+
     let message = 'An error occurred during authentication';
     
     if (error.code) {
@@ -200,13 +192,22 @@ export class AuthService {
           message = 'Invalid password';
           break;
         case 'auth/too-many-requests':
-          message = 'Too many unsuccessful login attempts. Please try again later';
+          message = 'Too many attempts. Please try again later';
+          break;
+        case 'auth/quota-exceeded':
+          message = 'Service temporarily unavailable. Please try again later';
           break;
         default:
-          message = error.message || message;
+          if (error.response?.data?.detail) {
+            message = error.response.data.detail;
+          } else {
+            message = error.message || 'Authentication failed';
+          }
       }
+    } else if (error.response?.data?.detail) {
+      message = error.response.data.detail;
     }
-    
+
     return new Error(message);
   }
 }

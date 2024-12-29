@@ -1,27 +1,22 @@
+import React from 'react';
 import { Box } from '@chakra-ui/react';
-import { Navigation } from './Navigation';
-import { ReactNode } from 'react';
-import { AnimatePresence } from 'framer-motion';
-import { useLocation } from 'react-router-dom';
-import { PageTransition } from './PageTransition';
+import Navbar from './Navbar';
+import Footer from './Footer';
 
 interface LayoutProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
-export const Layout = ({ children }: LayoutProps) => {
-  const location = useLocation();
-
+const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <Box>
-      <Navigation />
-      <Box pt="60px"> {/* Add padding to account for fixed navbar */}
-        <AnimatePresence mode="wait">
-          <PageTransition key={location.pathname}>
-            {children}
-          </PageTransition>
-        </AnimatePresence>
+    <Box minH="100vh" display="flex" flexDirection="column">
+      <Navbar />
+      <Box flex="1" as="main" py={8}>
+        {children}
       </Box>
+      <Footer />
     </Box>
   );
 };
+
+export default Layout;

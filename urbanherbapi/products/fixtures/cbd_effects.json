@@ -1,0 +1,74 @@
+[
+    {
+        "model": "products.cbdeffect",
+        "pk": 1,
+        "fields": {
+            "name": "Pain Relief",
+            "description": "Helps reduce chronic pain and inflammation",
+            "icon": "FaPrescriptionBottle"
+        }
+    },
+    {
+        "model": "products.cbdeffect",
+        "pk": 2,
+        "fields": {
+            "name": "Anxiety Relief",
+            "description": "Helps reduce anxiety and promote calmness",
+            "icon": "FaHeart"
+        }
+    },
+    {
+        "model": "products.cbdeffect",
+        "pk": 3,
+        "fields": {
+            "name": "Better Sleep",
+            "description": "Promotes better sleep quality and helps with insomnia",
+            "icon": "FaMoon"
+        }
+    },
+    {
+        "model": "products.cbdeffect",
+        "pk": 4,
+        "fields": {
+            "name": "Stress Relief",
+            "description": "Helps manage stress and promotes relaxation",
+            "icon": "FaLeaf"
+        }
+    },
+    {
+        "model": "products.cbdeffect",
+        "pk": 5,
+        "fields": {
+            "name": "Focus",
+            "description": "Improves concentration and mental clarity",
+            "icon": "FaBrain"
+        }
+    },
+    {
+        "model": "products.cbdeffect",
+        "pk": 6,
+        "fields": {
+            "name": "Mood Enhancement",
+            "description": "Helps stabilize mood and promote positive feelings",
+            "icon": "FaSmile"
+        }
+    },
+    {
+        "model": "products.cbdeffect",
+        "pk": 7,
+        "fields": {
+            "name": "Anti-Inflammatory",
+            "description": "Reduces inflammation throughout the body",
+            "icon": "FaHandHoldingMedical"
+        }
+    },
+    {
+        "model": "products.cbdeffect",
+        "pk": 8,
+        "fields": {
+            "name": "Nausea Relief",
+            "description": "Helps reduce nausea and improve appetite",
+            "icon": "FaStomach"
+        }
+    }
+]

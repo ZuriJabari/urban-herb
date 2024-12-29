@@ -1,186 +1,231 @@
+import React from 'react';
 import {
   Box,
   Image,
   Text,
-  Stack,
-  Button,
-  IconButton,
+  VStack,
+  HStack,
+  Badge,
+  Icon,
   useColorModeValue,
   Tooltip,
-  useToast,
+  Flex,
+  IconButton,
+  Spacer,
 } from '@chakra-ui/react';
-import { FaHeart, FaShoppingCart } from 'react-icons/fa';
+import { FaStar, FaLeaf, FaHeart, FaRegHeart } from 'react-icons/fa';
 import { Product } from '../types/product';
-import { useCart } from '../contexts/CartContext';
+import { Link, useNavigate } from 'react-router-dom';
+import { formatPrice } from '../utils/formatters';
 import { useWishlist } from '../contexts/WishlistContext';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '@chakra-ui/react';
 
 interface ProductCardProps {
   product: Product;
 }
 
 export const ProductCard = ({ product }: ProductCardProps) => {
-  const { addToCart } = useCart();
+  const { isAuthenticated } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
-  const toast = useToast();
-  const [isImageLoaded, setIsImageLoaded] = useState(false);
   const navigate = useNavigate();
+  const toast = useToast();
 
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const textColor = useColorModeValue('gray.600', 'gray.200');
-  const priceColor = useColorModeValue('green.600', 'green.300');
+  const cardBg = useColorModeValue('white', 'gray.800');
+  const textColor = useColorModeValue('gray.800', 'white');
+  const subTextColor = useColorModeValue('gray.600', 'gray.400');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const hoverBg = useColorModeValue('gray.50', 'gray.700');
 
-  const handleAddToCart = () => {
-    addToCart({
-      id: product.id,
-      name: product.name,
-      price: parseFloat(product.price),
-      image: product.images?.[0]?.image || '',
-      quantity: 1
-    });
-    toast({
-      title: 'Added to cart',
-      description: `${product.name} has been added to your cart`,
-      status: 'success',
-      duration: 2000,
-      isClosable: true,
-      position: 'bottom-right',
-    });
-  };
+  const handleWishlistClick = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent navigation to product detail
+    e.stopPropagation(); // Stop event propagation
 
-  const handleWishlistToggle = () => {
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
+    if (!isAuthenticated) {
       toast({
-        title: 'Removed from wishlist',
-        description: `${product.name} has been removed from your wishlist`,
-        status: 'info',
-        duration: 2000,
+        title: 'Authentication Required',
+        description: 'Please login to add items to your wishlist',
+        status: 'warning',
+        duration: 3000,
         isClosable: true,
-        position: 'bottom-right',
       });
-    } else {
-      addToWishlist(product);
+      return;
+    }
+
+    try {
+      if (isInWishlist(product.id)) {
+        await removeFromWishlist(product.id);
+        toast({
+          title: 'Removed from Wishlist',
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+        });
+      } else {
+        await addToWishlist(product);
+        toast({
+          title: 'Added to Wishlist',
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
       toast({
-        title: 'Added to wishlist',
-        description: `${product.name} has been added to your wishlist`,
-        status: 'success',
-        duration: 2000,
+        title: 'Error',
+        description: 'Failed to update wishlist',
+        status: 'error',
+        duration: 3000,
         isClosable: true,
-        position: 'bottom-right',
       });
     }
   };
 
+  const handleCardClick = () => {
+    navigate(`/products/${product.slug}`);
+  };
+
+  if (!product) {
+    console.error('ProductCard: No product data provided');
+    return null;
+  }
+
   return (
     <Box
-      as={motion.div}
-      whileHover={{ y: -5 }}
-      bg={bgColor}
-      rounded="lg"
-      shadow="sm"
-      position="relative"
+      as={Link}
+      to={`/products/${product.slug}`}
+      display="block"
+      bg={cardBg}
+      borderWidth="1px"
+      borderColor={borderColor}
+      borderRadius="lg"
       overflow="hidden"
-      transition="all 0.2s"
-      _hover={{ shadow: 'lg' }}
-      onClick={() => navigate(`/products/${product.id}`)}
-      cursor="pointer"
+      transition="all 0.3s"
+      _hover={{
+        transform: 'translateY(-4px)',
+        shadow: 'lg',
+        bg: hoverBg,
+        textDecoration: 'none',
+      }}
+      position="relative"
+      height="100%"
+      onClick={handleCardClick}
     >
-      <Box position="relative" height="200px" overflow="hidden">
-        <AnimatePresence mode="wait">
-          {!isImageLoaded && (
-            <Box
-              as={motion.div}
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              position="absolute"
-              top={0}
-              left={0}
-              right={0}
-              bottom={0}
-              bg="gray.100"
-            />
-          )}
-        </AnimatePresence>
+      {/* Favorite Button */}
+      <IconButton
+        icon={<Icon as={isInWishlist(product.id) ? FaHeart : FaRegHeart} />}
+        aria-label={isInWishlist(product.id) ? "Remove from wishlist" : "Add to wishlist"}
+        position="absolute"
+        top={2}
+        right={2}
+        size="sm"
+        colorScheme="pink"
+        variant={isInWishlist(product.id) ? "solid" : "ghost"}
+        zIndex={2}
+        onClick={handleWishlistClick}
+      />
+
+      {/* Image Container */}
+      <Box position="relative" paddingTop="100%" overflow="hidden">
         <Image
-          src={product.images?.[0]?.image || '/placeholder.jpg'}
+          src={product.images[0]?.image || '/placeholder.jpg'}
           alt={product.name}
-          objectFit="cover"
+          position="absolute"
+          top={0}
+          left={0}
           width="100%"
           height="100%"
-          onLoad={() => setIsImageLoaded(true)}
-          opacity={isImageLoaded ? 1 : 0}
-          transition="opacity 0.3s"
-        />
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ delay: 0.2 }}
-          style={{
-            position: 'absolute',
-            top: '8px',
-            right: '8px',
+          objectFit="cover"
+          transition="transform 0.3s ease-in-out"
+          _hover={{ transform: 'scale(1.05)' }}
+          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+            console.error('Image load error:', e);
+            e.currentTarget.src = '/placeholder.jpg';
           }}
-        >
-          <Tooltip
-            label={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-            placement="left"
-          >
-            <IconButton
-              aria-label="Add to wishlist"
-              icon={<FaHeart />}
-              size="sm"
-              colorScheme={isInWishlist(product.id) ? 'red' : 'gray'}
-              variant="solid"
-              onClick={handleWishlistToggle}
-              opacity={0.8}
-              _hover={{ opacity: 1 }}
-            />
-          </Tooltip>
-        </motion.div>
+        />
+        
+        {/* Badges */}
+        <HStack position="absolute" top={2} left={2} spacing={2}>
+          {product.featured && (
+            <Badge colorScheme="purple" variant="solid">
+              Featured
+            </Badge>
+          )}
+          {product.stock <= 0 && (
+            <Badge colorScheme="red" variant="solid">
+              Out of Stock
+            </Badge>
+          )}
+          {product.discount_price && (
+            <Badge colorScheme="green" variant="solid">
+              Sale
+            </Badge>
+          )}
+        </HStack>
       </Box>
 
-      <Stack p={4} spacing={2}>
+      {/* Product Info */}
+      <VStack p={4} align="stretch" spacing={2}>
+        <Text
+          fontSize="sm"
+          color={subTextColor}
+          textTransform="uppercase"
+          fontWeight="medium"
+        >
+          {product.category}
+        </Text>
+
         <Text
           fontSize="lg"
           fontWeight="semibold"
           color={textColor}
-          noOfLines={1}
+          noOfLines={2}
+          title={product.name}
         >
           {product.name}
         </Text>
-        <Text fontSize="sm" color={textColor} noOfLines={2}>
-          {product.description}
-        </Text>
-        <Stack
-          direction="row"
-          justify="space-between"
-          align="center"
-          mt={2}
+
+        <HStack spacing={2}>
+          {product.discount_price ? (
+            <>
+              <Text fontSize="lg" fontWeight="bold" color="green.500">
+                {formatPrice(product.discount_price)}
+              </Text>
+              <Text fontSize="md" color={subTextColor} textDecoration="line-through">
+                {formatPrice(product.price)}
+              </Text>
+            </>
+          ) : (
+            <Text fontSize="lg" fontWeight="bold" color={textColor}>
+              {formatPrice(product.price)}
+            </Text>
+          )}
+        </HStack>
+
+        {/* Rating */}
+        {product.average_rating !== undefined && (
+          <HStack spacing={1}>
+            <Icon as={FaStar} color="yellow.400" />
+            <Text fontSize="sm" color={subTextColor}>
+              {product.average_rating.toFixed(1)}
+            </Text>
+            {product.review_count !== undefined && (
+              <Text fontSize="sm" color={subTextColor}>
+                ({product.review_count})
+              </Text>
+            )}
+          </HStack>
+        )}
+
+        {/* Stock Status */}
+        <Text
+          fontSize="sm"
+          color={product.stock > 0 ? "green.500" : "red.500"}
+          fontWeight="medium"
         >
-          <Text
-            fontSize="xl"
-            fontWeight="bold"
-            color={priceColor}
-          >
-            ${product.price}
-          </Text>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button
-              leftIcon={<FaShoppingCart />}
-              colorScheme="green"
-              variant="solid"
-              size="sm"
-              onClick={handleAddToCart}
-            >
-              Add to Cart
-            </Button>
-          </motion.div>
-        </Stack>
-      </Stack>
+          {product.stock > 0 ? `In Stock (${product.stock})` : 'Out of Stock'}
+        </Text>
+      </VStack>
     </Box>
   );
 };
