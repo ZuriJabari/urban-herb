@@ -15,6 +15,17 @@ class Brand(models.Model):
     def __str__(self):
         return self.name
 
+class CBDEffect(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField()
+    icon = models.CharField(max_length=100, blank=True, null=True)  # For storing icon names/classes
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
 class Product(models.Model):
     CATEGORY_CHOICES = [
         ('FLOWERS', 'Flowers'),
@@ -57,7 +68,7 @@ class Product(models.Model):
     strain = models.CharField(max_length=20, choices=STRAIN_CHOICES, default='NA')
     thc_content = models.CharField(max_length=20, blank=True)
     cbd_content = models.CharField(max_length=20, blank=True)
-    effects = models.TextField(blank=True)  # Store as JSON string
+    effects = models.ManyToManyField(CBDEffect, related_name='products', blank=True)
     benefits = models.TextField(blank=True)  # Store as JSON string
     price = models.DecimalField(max_digits=10, decimal_places=2)
     discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
@@ -86,14 +97,6 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
-
-    def set_effects(self, effects_list):
-        self.effects = json.dumps(effects_list)
-
-    def get_effects(self):
-        if self.effects:
-            return json.loads(self.effects)
-        return []
 
     def set_benefits(self, benefits_list):
         self.benefits = json.dumps(benefits_list)

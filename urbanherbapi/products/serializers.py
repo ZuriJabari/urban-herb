@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product, Brand, ProductImage, Review, Cart, CartItem, Wishlist
+from .models import Product, Brand, ProductImage, Review, Cart, CartItem, Wishlist, CBDEffect
 from django.db.models import Avg
 import json
 
@@ -26,55 +26,62 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
         model = Review
         fields = ['product', 'rating', 'title', 'content']
 
+class CBDEffectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CBDEffect
+        fields = ['id', 'name', 'description', 'icon']
+
 class ProductSerializer(serializers.ModelSerializer):
-    brand = BrandSerializer(read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
     reviews = ReviewSerializer(many=True, read_only=True)
-    effects = serializers.ListField(child=serializers.CharField(), required=False)
-    benefits = serializers.ListField(child=serializers.CharField(), required=False)
     average_rating = serializers.FloatField(read_only=True)
-    total_reviews = serializers.IntegerField(read_only=True)
-
+    review_count = serializers.IntegerField(read_only=True)
+    effects = CBDEffectSerializer(many=True, read_only=True)
+    brand = BrandSerializer(read_only=True)
+    price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    stock = serializers.IntegerField()
+    
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'description', 'price', 'category', 'brand', 'strain',
-            'thc_content', 'cbd_content', 'effects', 'benefits', 'lab_tested', 'stock',
-            'images', 'reviews', 'average_rating', 'total_reviews', 'created_at',
-            'updated_at'
+            'id', 'name', 'slug', 'description', 'category', 'strain',
+            'thc_content', 'cbd_content', 'effects', 'benefits',
+            'price', 'discount_price', 'stock', 'featured',
+            'created_at', 'updated_at', 'images', 'reviews',
+            'average_rating', 'review_count', 'brand', 'lab_tested',
+            'weight', 'dosage', 'ingredients', 'usage_instructions',
+            'warning'
         ]
-
-    def get_average_rating(self, obj):
-        return obj.reviews.aggregate(Avg('rating'))['rating__avg'] or 0.0
-
-    def get_total_reviews(self, obj):
-        return obj.reviews.count()
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
+        
+        # Ensure price and stock are properly serialized
+        ret['price'] = float(instance.price)
+        ret['stock'] = int(instance.stock)
+        
         # Convert JSON strings to lists for effects and benefits
-        try:
-            ret['effects'] = json.loads(instance.effects) if instance.effects else []
-        except (TypeError, json.JSONDecodeError):
-            ret['effects'] = []
-
         try:
             ret['benefits'] = json.loads(instance.benefits) if instance.benefits else []
         except (TypeError, json.JSONDecodeError):
             ret['benefits'] = []
 
+        # Ensure arrays are initialized
+        ret['images'] = ret.get('images', [])
+        ret['effects'] = ret.get('effects', [])
+        ret['reviews'] = ret.get('reviews', [])
+
+        # Calculate average rating and review count
         ret['average_rating'] = self.get_average_rating(instance)
-        ret['total_reviews'] = self.get_total_reviews(instance)
+        ret['review_count'] = self.get_review_count(instance)
 
         return ret
 
-    def to_internal_value(self, data):
-        # Convert lists to JSON strings for effects and benefits
-        if 'effects' in data:
-            data['effects'] = json.dumps(data['effects'])
-        if 'benefits' in data:
-            data['benefits'] = json.dumps(data['benefits'])
-        return super().to_internal_value(data)
+    def get_average_rating(self, obj):
+        return float(obj.reviews.aggregate(Avg('rating'))['rating__avg'] or 0.0)
+
+    def get_review_count(self, obj):
+        return obj.reviews.count()
 
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     effects = serializers.ListField(child=serializers.CharField(), required=False)

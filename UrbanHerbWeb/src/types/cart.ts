@@ -7,10 +7,10 @@ export interface CartItem {
 
 export interface CartContextType {
   items: CartItem[];
-  addItem: (product: Product, quantity?: number) => Promise<void>;
-  removeItem: (productId: number) => Promise<void>;
-  updateQuantity: (productId: number, quantity: number) => Promise<void>;
-  clearCart: () => Promise<void>;
-  total: number;
   loading: boolean;
+  error: string | null;
+  addToCart: (product: Product, quantity?: number) => Promise<void>;
+  updateQuantity: (productId: number, quantity: number) => Promise<void>;
+  removeFromCart: (productId: number) => Promise<void>;
+  clearCart: () => Promise<void>;
 }

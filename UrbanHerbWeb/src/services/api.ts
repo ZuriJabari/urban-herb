@@ -18,8 +18,10 @@ interface AuthResponse {
   user: User;
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+
 const api = axios.create({
-  baseURL: 'http://localhost:8001',
+  baseURL: `${API_URL}/api/v1`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -121,7 +123,7 @@ api.interceptors.response.use(
           throw new Error('No refresh token available');
         }
 
-        const response = await api.post<AuthResponse>('/api/v1/auth/token/refresh/', {
+        const response = await api.post<AuthResponse>('/auth/token/refresh/', {
           refresh: refreshToken,
         });
 
@@ -163,7 +165,7 @@ const formatPhoneNumber = (phone: string): string => {
 
 export const authApi = {
   register: (data: RegisterData) => {
-    return api.post<AuthResponse>('/api/v1/auth/register/', {
+    return api.post<AuthResponse>('/auth/register/', {
       email: data.email,
       password: data.password,
       confirm_password: data.confirm_password,
@@ -173,30 +175,30 @@ export const authApi = {
   },
 
   loginWithEmail: (data: EmailLoginData) =>
-    api.post<AuthResponse>('/api/v1/auth/login/', {
+    api.post<AuthResponse>('/auth/login/', {
       email: data.email,
       password: data.password,
     }),
 
   requestPasswordReset: (data: PasswordResetRequestData) =>
-    api.post<{ message: string }>('/api/v1/auth/password/reset/', data),
+    api.post<{ message: string }>('/auth/password/reset/', data),
 
   confirmPasswordReset: (data: PasswordResetConfirmData) =>
-    api.post<{ message: string }>('/api/v1/auth/password/reset/confirm/', data),
+    api.post<{ message: string }>('/auth/password/reset/confirm/', data),
 
   changePassword: (data: ChangePasswordData) =>
-    api.post<{ message: string }>('/api/v1/auth/password/change/', data),
+    api.post<{ message: string }>('/auth/password/change/', data),
 
   verifyEmail: (data: { email: string; code: string }) => {
-    return api.post<AuthResponse>('/api/v1/auth/verify-email/', data);
+    return api.post<AuthResponse>('/auth/verify-email/', data);
   },
 
   resendEmailVerification: (email: string) => {
-    return api.post<{ message: string }>('/api/v1/auth/resend-verification/', { email });
+    return api.post<{ message: string }>('/auth/resend-verification/', { email });
   },
 
   logout: () => {
-    return api.post('/api/v1/auth/logout/').then(() => {
+    return api.post('/auth/logout/').then(() => {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
     });
@@ -205,31 +207,39 @@ export const authApi = {
 
 export const userApi = {
   getProfile: () => 
-    api.get<User>('/api/v1/auth/profile/'),
+    api.get<User>('/auth/profile/'),
 
   updateProfile: (data: Partial<User>) =>
-    api.patch<User>('/api/v1/auth/profile/', data),
+    api.patch<User>('/auth/profile/', data),
 
   getAddresses: () =>
-    api.get<User>('/api/v1/auth/addresses/'),
+    api.get<User>('/auth/addresses/'),
 
   createAddress: (data: Omit<User, 'id'>) =>
-    api.post<User>('/api/v1/auth/addresses/', data),
+    api.post<User>('/auth/addresses/', data),
 
   updateAddress: (id: string, data: Partial<User>) =>
-    api.patch<User>(`/api/v1/auth/addresses/${id}/`, data),
+    api.patch<User>(`/auth/addresses/${id}/`, data),
 
   deleteAddress: (id: string) =>
-    api.delete(`/api/v1/auth/addresses/${id}/`),
+    api.delete(`/auth/addresses/${id}/`),
 
   setDefaultAddress: (id: string) =>
-    api.post(`/api/v1/auth/addresses/${id}/set-default/`, {}),
+    api.post(`/auth/addresses/${id}/set-default/`, {}),
 
   getPreferences: () =>
-    api.get<User>('/api/v1/auth/preferences/'),
+    api.get<User>('/auth/preferences/'),
 
   updatePreferences: (data: Partial<User>) =>
-    api.patch<User>('/api/v1/auth/preferences/', data),
+    api.patch<User>('/auth/preferences/', data),
 };
+
+// Public API instance without auth requirements
+export const publicApi = axios.create({
+  baseURL: `${API_URL}/api/v1`,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
 export default api;

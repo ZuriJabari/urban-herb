@@ -1,6 +1,6 @@
-import { Button, VStack, FormControl, FormLabel, Input, Text, useToast, Center, Box } from '@chakra-ui/react';
-import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { Button, VStack, FormControl, FormLabel, Input, Text, useToast, Center, Box, useColorModeValue } from '@chakra-ui/react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage = () => {
@@ -8,15 +8,40 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
-  const { loginWithEmail } = useAuth();
+  const { loginWithEmail, user, loading } = useAuth();
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  // Debug logging for component state
+  useEffect(() => {
+    console.log('LoginPage - Component State:', {
+      isLoading,
+      loading,
+      user,
+      hasToken: !!localStorage.getItem('token'),
+      hasRefreshToken: !!localStorage.getItem('refresh_token'),
+      location: location.pathname,
+      from: location.state?.from
+    });
+  }, [isLoading, loading, user, location]);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && !loading) {
+      console.log('LoginPage - User already logged in, redirecting');
+      const from = location.state?.from?.pathname || '/';
+      navigate(from, { replace: true });
+    }
+  }, [user, loading, navigate, location]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      console.log('Attempting login with:', { email, password: '****' });
-      await loginWithEmail({ email, password });
+      console.log('LoginPage - Attempting login:', { email });
+      await loginWithEmail(email, password);
+      console.log('LoginPage - Login successful');
+      
       toast({
         title: 'Login successful',
         description: 'Welcome back!',
@@ -24,19 +49,13 @@ const LoginPage = () => {
         duration: 3000,
         isClosable: true,
       });
-    } catch (error: any) {
-      console.error('Login error:', {
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
-      const errorMessage = error.response?.data?.error || 
-                       error.response?.data?.detail ||
-                       error.response?.data?.non_field_errors?.[0] ||
-                       'Login failed. Please check your email and password.';
+
+      // Navigation will be handled by the useEffect
+    } catch (error) {
+      console.error('LoginPage - Login error:', error);
       toast({
         title: 'Login failed',
-        description: errorMessage,
+        description: error instanceof Error ? error.message : 'An error occurred during login',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -47,64 +66,68 @@ const LoginPage = () => {
   };
 
   return (
-    <Center minH="100vh" bg="gray.50">
-      <VStack spacing={8} w="full" maxW="md" bg="white" p={8} borderRadius="lg" boxShadow="md">
-        <Text fontSize="2xl" fontWeight="bold">Welcome Back</Text>
-        
-        <form onSubmit={handleEmailLogin} style={{ width: '100%' }}>
-          <VStack spacing={4} w="full">
-            <FormControl isRequired>
-              <FormLabel>Email</FormLabel>
+    <Center minH="calc(100vh - 60px)" bg={useColorModeValue('gray.50', 'gray.800')}>
+      <Box
+        p={8}
+        maxWidth="400px"
+        borderWidth={1}
+        borderRadius={8}
+        boxShadow="lg"
+        bg={useColorModeValue('white', 'gray.700')}
+      >
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={4}>
+            <Text fontSize="2xl" fontWeight="bold">
+              Sign In
+            </Text>
+            
+            <FormControl id="email" isRequired>
+              <FormLabel>Email address</FormLabel>
               <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
+                disabled={isLoading}
               />
             </FormControl>
-            
-            <FormControl isRequired>
+
+            <FormControl id="password" isRequired>
               <FormLabel>Password</FormLabel>
               <Input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
+                disabled={isLoading}
               />
             </FormControl>
-            
+
             <Button
               type="submit"
               colorScheme="green"
-              w="full"
+              width="full"
+              mt={4}
               isLoading={isLoading}
+              loadingText="Signing in..."
             >
-              Login with Email
+              Sign In
             </Button>
+
+            <Text pt={2}>
+              Don't have an account?{' '}
+              <Button
+                variant="link"
+                colorScheme="green"
+                onClick={() => navigate('/register')}
+                disabled={isLoading}
+              >
+                Register
+              </Button>
+            </Text>
           </VStack>
         </form>
-        
-        <Box w="full" textAlign="center">
-          <Text mb={2}>
-            Don't have an account?{' '}
-            <Button
-              variant="link"
-              colorScheme="green"
-              onClick={() => navigate('/register')}
-            >
-              Sign up
-            </Button>
-          </Text>
-          
-          <Button
-            variant="link"
-            colorScheme="green"
-            onClick={() => navigate('/forgot-password')}
-          >
-            Forgot Password?
-          </Button>
-        </Box>
-      </VStack>
+      </Box>
     </Center>
   );
 };
